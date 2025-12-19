@@ -88,9 +88,7 @@
       flex:0 0 auto;
     }
 
-    .scanner-panel {
-      gap:8px;
-    }
+    .scanner-panel { gap:8px; }
 
     .camera-container {
       width:100%;
@@ -341,6 +339,8 @@
       to { transform:translateX(0); opacity:1; }
     }
 
+    .hidden { display:none !important; }
+
     @media (max-width:900px) {
       .main {
         grid-template-columns:1fr;
@@ -415,6 +415,7 @@
 
         <div class="btn-group">
           <button class="btn btn-primary" onclick="exportToCSV()">📥 Экспорт CSV (локально)</button>
+          <button class="btn btn-secondary" onclick="toggleFooterStats()">📊 Статистика</button>
         </div>
       </div>
 
@@ -468,7 +469,23 @@
       </div>
     </div>
 
-  
+    <!-- Футер-статистика, по кнопке 📊 -->
+    <div id="footerStatsWrapper" class="footer-stats hidden">
+      <div class="footer-grid">
+        <div class="footer-item">
+          <span>Всего записей</span>
+          <strong id="totalScansFooter">0</strong>
+        </div>
+        <div class="footer-item">
+          <span>Сегодня</span>
+          <strong id="todayScansFooter">0</strong>
+        </div>
+        <div class="footer-item">
+          <span>Последний блок</span>
+          <strong id="lastBlockFooter">-</strong>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="loading" id="loading">
@@ -476,7 +493,9 @@
   </div>
 
   <script>
-    // ===== Service Worker (offline-first) =====
+    const API_URL = '/api/scans/bulk'; // URL серверного API для синхронизации
+
+    // Service Worker для offline
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').catch(console.error);
     }
@@ -559,7 +578,7 @@
       showNotification(`📷 Обнаружен: ${code}`, 'info');
     }
 
-    // ===== IndexedDB (локальное хранилище) =====
+    // ===== IndexedDB =====
     const db = {
       name: 'sampling_scans_db_v2',
       instance: null,
@@ -632,7 +651,6 @@
     // ===== UI & логика =====
     let currentUser = localStorage.getItem('scan_user') || 'Оператор';
     let allScans = [];
-    let filteredScans = [];
 
     function showNotification(msg, type='info') {
       const el = document.createElement('div');
@@ -703,6 +721,11 @@
       renderScans(scans);
     }
 
+    function toggleFooterStats() {
+      const el = document.getElementById('footerStatsWrapper');
+      el.classList.toggle('hidden');
+    }
+
     async function processScan() {
       const sample = document.getElementById('sampleInput').value.trim();
       const wellName = document.getElementById('wellNameInput').value.trim();
@@ -765,7 +788,6 @@
       }
     }
 
-    // ===== Локальный экспорт CSV (без сервера) =====
     async function exportToCSV() {
       showLoading(true);
       try {
@@ -799,22 +821,37 @@
       }
     }
 
-    // ===== Синхронизация с сайтом (под API) =====
     async function syncPendingScans() {
       if (!navigator.onLine) return;
       try {
         const pending = await db.getPendingScans();
         if (!pending.length) return;
 
-        const res = await fetch('/api/scans/bulk', {
+        const deviceId = localStorage.getItem('device_id') ||
+          (function () {
+            const id = 'dev-' + Math.random().toString(36).slice(2);
+            localStorage.setItem('device_id', id);
+            return id;
+          })();
+
+        const payload = pending.map(p => ({
+          device_id: deviceId,
+          sample: p.sample,
+          well_name: p.well_name,
+          block: p.block,
+          type: p.type,
+          scanned_at: p.scanned_at,
+          scanned_by: p.scanned_by
+        }));
+
+        const res = await fetch(API_URL, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify(pending)
+          body:JSON.stringify(payload)
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
 
-        const syncedIds = pending.map(s => s.id);
-        await db.markSynced(syncedIds);
+        await db.markSynced(pending.map(p => p.id));
         await refreshScans();
         showNotification(`✓ Синхронизировано: ${pending.length}`, 'success');
       } catch (e) {
@@ -872,4 +909,3 @@
   </script>
 </body>
 </html>
-
