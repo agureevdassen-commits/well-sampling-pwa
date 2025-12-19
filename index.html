@@ -15,6 +15,9 @@
   
   <title>Паспорт опробования скважин</title>
   
+  <!-- ZXing Barcode Scanner Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+  
   <style>
     * {
       margin: 0;
@@ -113,6 +116,79 @@
       margin: 0 0 12px 0;
       border-bottom: 2px solid var(--primary);
       padding-bottom: 8px;
+    }
+
+    /* ===== ВИДЕО ПОТОК ===== */
+    .camera-container {
+      width: 100%;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+      margin-bottom: 12px;
+      position: relative;
+    }
+
+    #video {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .camera-status {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .camera-status.active {
+      background: rgba(40, 167, 69, 0.9);
+    }
+
+    .camera-status.error {
+      background: rgba(220, 53, 69, 0.9);
+    }
+
+    .camera-controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .camera-controls button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-camera {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-camera:active {
+      background: #5a67d8;
+      transform: scale(0.98);
+    }
+
+    .btn-camera.recording {
+      background: var(--danger);
+    }
+
+    .btn-camera:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .scanner-input {
@@ -219,26 +295,6 @@
       border-bottom: 2px solid var(--primary);
     }
 
-    /* ===== ЗАГРУЗКА ФАЙЛА ===== */
-    .file-upload {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .file-upload input {
-      padding: 8px;
-      border: 2px dashed #ddd;
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-
-    .file-upload input:hover {
-      border-color: var(--primary);
-      background: rgba(102, 126, 234, 0.05);
-    }
-
     /* ===== КНОПКИ ===== */
     .btn-group {
       display: flex;
@@ -277,19 +333,9 @@
       background: #e9ecef;
     }
 
-    .btn-success {
-      background: var(--success);
-      color: white;
-    }
-
     .btn-danger {
       background: var(--danger);
       color: white;
-    }
-
-    .btn-small {
-      padding: 6px 10px;
-      font-size: 12px;
     }
 
     /* ===== ТАБЛИЦА СКВАЖИН ===== */
@@ -397,6 +443,7 @@
       max-height: 90vh;
       overflow-y: auto;
       box-shadow: var(--shadow-lg);
+      position: relative;
     }
 
     .modal-content h2 {
@@ -506,6 +553,10 @@
         min-height: 60px;
         font-size: 12px;
       }
+
+      #video {
+        height: 150px;
+      }
     }
 
     /* ===== LOADING ===== */
@@ -539,7 +590,7 @@
       to { transform: rotate(360deg); }
     }
 
-    /* ===== СКРЫТИЕ ЛИШНИХ ЭЛЕМЕНТОВ ===== */
+    /* ===== СКРЫТИЕ ===== */
     .hidden {
       display: none !important;
     }
@@ -570,14 +621,26 @@
     <div class="main">
       <!-- ЛЕВАЯ ПАНЕЛЬ: СКАНИРОВАНИЕ -->
       <div class="scanner-panel">
-        <h2>🔍 Сканирование штрихкодов</h2>
+        <h2>📷 Сканирование штрихкодов</h2>
 
-        <!-- Ввод штрихкода -->
+        <!-- Видео поток камеры -->
+        <div class="camera-container">
+          <video id="video" playsinline></video>
+          <div class="camera-status" id="cameraStatus">📹 Камера</div>
+        </div>
+
+        <!-- Управление камерой -->
+        <div class="camera-controls">
+          <button class="btn-camera" id="startCameraBtn" onclick="startCamera()">▶ Включить камеру</button>
+          <button class="btn-camera" id="stopCameraBtn" onclick="stopCamera()" disabled>⏹ Выключить</button>
+        </div>
+
+        <!-- Ввод вручную -->
         <div class="scanner-input">
           <input 
             type="text" 
             id="barcodeInput" 
-            placeholder="Сканируйте или введите ID скважины"
+            placeholder="Или введите ID скважины"
             autocomplete="off"
           >
           <button onclick="processScan()">✓ Сканировать</button>
@@ -611,9 +674,9 @@
 
         <!-- Действия -->
         <div class="btn-group">
-          <button class="btn btn-primary" onclick="showUploadModal()">📁 Загрузить DVG файл</button>
-          <button class="btn btn-secondary" onclick="showDuplicatesModal()">🔄 Генерировать дубликаты</button>
-          <button class="btn btn-secondary" onclick="exportToExcel()">📥 Экспорт в Excel</button>
+          <button class="btn btn-primary" onclick="showAddWellsModal()">➕ Добавить скважины</button>
+          <button class="btn btn-secondary" onclick="showDuplicatesModal()">🔄 Дубликаты</button>
+          <button class="btn btn-secondary" onclick="exportToCSV()">📥 Экспорт CSV</button>
         </div>
       </div>
 
@@ -646,14 +709,14 @@
                 <tr>
                   <th>ID</th>
                   <th>Название</th>
-                  <th>Координаты</th>
+                  <th>X, Y</th>
                   <th>Статус</th>
                 </tr>
               </thead>
               <tbody id="wellsTableBody">
                 <tr>
                   <td colspan="4" style="text-align: center; color: #999; padding: 20px;">
-                    Нет данных. Загрузите DVG файл
+                    Нет данных. Добавьте скважины
                   </td>
                 </tr>
               </tbody>
@@ -687,16 +750,20 @@
     </div>
   </div>
 
-  <!-- MODAL: Загрузка файла -->
-  <div class="modal" id="uploadModal">
+  <!-- MODAL: Добавить скважины -->
+  <div class="modal" id="addWellsModal">
     <div class="modal-content">
-      <button class="modal-close" onclick="closeModal('uploadModal')">✕</button>
-      <h2>📁 Загрузить реестр скважин (DVG)</h2>
+      <button class="modal-close" onclick="closeModal('addWellsModal')">✕</button>
+      <h2>➕ Добавить скважины</h2>
       <p style="font-size: 12px; color: #666; margin-bottom: 12px;">
-        Выберите Excel файл с колонками: ID, X, Y, Z, Наименование
+        Введите данные в формате: ID, X, Y, Z, Название (по одной на строку)
       </p>
-      <input type="file" id="dvgFile" accept=".xlsx,.xls,.csv" style="width: 100%; margin-bottom: 12px;">
-      <button class="btn btn-primary" onclick="uploadDVGFile()" style="width: 100%;">📤 Загрузить</button>
+      <textarea 
+        id="wellsTextarea" 
+        style="width: 100%; height: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; margin-bottom: 12px; font-size: 12px;"
+        placeholder="W001&#10;1234.56&#10;5678.90&#10;100.2&#10;Скважина 1"
+      ></textarea>
+      <button class="btn btn-primary" onclick="addWellsFromText()" style="width: 100%;">✓ Добавить</button>
     </div>
   </div>
 
@@ -704,11 +771,11 @@
   <div class="modal" id="duplicatesModal">
     <div class="modal-content">
       <button class="modal-close" onclick="closeModal('duplicatesModal')">✕</button>
-      <h2>🔄 Генерирование контрольных проб</h2>
+      <h2>🔄 Генерирование дубликатов</h2>
       <p style="font-size: 12px; color: #666; margin-bottom: 12px;">
         Выберите кратность дубликатов
       </p>
-      <select style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 4px;">
+      <select id="duplicateRatio" style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 4px;">
         <option value="1:10">Каждая 10-я проба (1:10)</option>
         <option value="1:20">Каждая 20-я проба (1:20)</option>
         <option value="1:5">Каждая 5-я проба (1:5)</option>
@@ -730,6 +797,78 @@
       navigator.serviceWorker.register('/service-worker.js')
         .then(reg => console.log('✓ Service Worker registered'))
         .catch(err => console.error('✗ Service Worker error:', err));
+    }
+
+    // ========== BARCODE SCANNER SETUP ==========
+    let codeReader = null;
+    let isScanning = false;
+
+    async function initBarcodeScanner() {
+      try {
+        const ZXing = window.ZXing;
+        codeReader = new ZXing.BrowserMultiFormatReader();
+        console.log('✓ Barcode scanner initialized');
+      } catch (error) {
+        console.error('Barcode scanner init error:', error);
+      }
+    }
+
+    async function startCamera() {
+      try {
+        if (!codeReader) await initBarcodeScanner();
+
+        const videoElement = document.getElementById('video');
+        const cameras = await codeReader.listVideoInputDevices();
+        
+        if (cameras.length === 0) {
+          showNotification('❌ Камера не найдена', 'error');
+          return;
+        }
+
+        const selectedDeviceId = cameras[cameras.length - 1].deviceId; // Задняя камера
+
+        isScanning = true;
+        document.getElementById('startCameraBtn').disabled = true;
+        document.getElementById('stopCameraBtn').disabled = false;
+        document.getElementById('cameraStatus').textContent = '🟢 Сканирует';
+        document.getElementById('cameraStatus').classList.add('active');
+
+        await codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+          if (result) {
+            handleBarcodeDetected(result.getText());
+          }
+          if (err && !(err instanceof ZXing.NotFoundException)) {
+            console.error('Scan error:', err);
+          }
+        });
+
+        showNotification('✓ Камера включена', 'success');
+      } catch (error) {
+        console.error('Camera error:', error);
+        showNotification(`❌ Ошибка камеры: ${error.message}`, 'error');
+        document.getElementById('cameraStatus').textContent = '🔴 Ошибка';
+        document.getElementById('cameraStatus').classList.add('error');
+        document.getElementById('startCameraBtn').disabled = false;
+        document.getElementById('stopCameraBtn').disabled = true;
+        isScanning = false;
+      }
+    }
+
+    function stopCamera() {
+      if (codeReader) {
+        codeReader.reset();
+      }
+      isScanning = false;
+      document.getElementById('startCameraBtn').disabled = false;
+      document.getElementById('stopCameraBtn').disabled = true;
+      document.getElementById('cameraStatus').textContent = '📹 Камера';
+      document.getElementById('cameraStatus').classList.remove('active', 'error');
+      showNotification('✓ Камера отключена', 'success');
+    }
+
+    function handleBarcodeDetected(barcode) {
+      document.getElementById('barcodeInput').value = barcode;
+      processScan();
     }
 
     // ========== DATABASE INITIALIZATION ==========
@@ -873,13 +1012,6 @@
           sampledWells: sampled,
           completionPercentage: completion.toFixed(1)
         };
-      },
-
-      async clearAllData() {
-        const tx = this.instance.transaction(['wells', 'duplicates', 'logs'], 'readwrite');
-        tx.objectStore('wells').clear();
-        tx.objectStore('duplicates').clear();
-        tx.objectStore('logs').clear();
       }
     };
 
@@ -912,8 +1044,8 @@
       document.getElementById(id).classList.remove('active');
     }
 
-    function showUploadModal() {
-      showModal('uploadModal');
+    function showAddWellsModal() {
+      showModal('addWellsModal');
     }
 
     function showDuplicatesModal() {
@@ -933,7 +1065,6 @@
         document.getElementById('progressBar').style.width = stats.completionPercentage + '%';
         document.getElementById('progressText').textContent = `${stats.sampledWells} из ${stats.totalWells} скважин`;
         
-        // Сегодняшние сканирования
         const today = new Date().toISOString().split('T');
         const logs = await db.getLogs();
         const todayLogs = logs.filter(l => 
@@ -963,7 +1094,7 @@
         <tr>
           <td><strong>${well.well_id}</strong></td>
           <td style="font-size: 10px;">${well.well_name}</td>
-          <td style="font-size: 9px;">X: ${well.x_coord.toFixed(1)}</td>
+          <td style="font-size: 9px;">${well.x_coord.toFixed(1)}, ${well.y_coord.toFixed(1)}</td>
           <td>
             <span class="status-badge ${well.sampling_status}">
               ${well.sampling_status === 'sampled' ? '✓' : '○'}
@@ -988,6 +1119,49 @@
       });
       
       renderWells(filteredWells);
+    }
+
+    // ========== ДОБАВЛЕНИЕ СКВАЖИН ==========
+    async function addWellsFromText() {
+      const text = document.getElementById('wellsTextarea').value.trim();
+      
+      if (!text) {
+        showNotification('⚠️ Введите данные', 'info');
+        return;
+      }
+
+      showLoading(true);
+      
+      try {
+        const lines = text.split('\n').filter(line => line.trim());
+        const wells = [];
+        
+        for (let i = 0; i < lines.length; i += 5) {
+          if (i + 4 < lines.length) {
+            wells.push({
+              well_id: lines[i].trim(),
+              x_coord: parseFloat(lines[i + 1].trim()),
+              y_coord: parseFloat(lines[i + 2].trim()),
+              z_coord: parseFloat(lines[i + 3].trim()),
+              well_name: lines[i + 4].trim()
+            });
+          }
+        }
+        
+        if (wells.length === 0) {
+          throw new Error('Нет валидных данных');
+        }
+        
+        const added = await db.addWells(wells);
+        showNotification(`✓ Добавлено ${added} скважин`, 'success');
+        document.getElementById('wellsTextarea').value = '';
+        closeModal('addWellsModal');
+        await updateStatistics();
+      } catch (error) {
+        showNotification(`❌ Ошибка: ${error.message}`, 'error');
+      } finally {
+        showLoading(false);
+      }
     }
 
     // ========== СКАНИРОВАНИЕ ==========
@@ -1042,80 +1216,28 @@
     }
 
     function playBeep() {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      
-      osc.connect(gain);
-      gain.connect(audioContext.destination);
-      
-      osc.frequency.value = 800;
-      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-      
-      osc.start(audioContext.currentTime);
-      osc.stop(audioContext.currentTime + 0.1);
-    }
-
-    // ========== ЗАГРУЗКА DVG ==========
-    async function uploadDVGFile() {
-      const file = document.getElementById('dvgFile').files;
-      if (!file) {
-        showNotification('⚠️ Выберите файл', 'info');
-        return;
-      }
-
-      showLoading(true);
-      
       try {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          try {
-            // Используем встроенный парсер CSV или простую обработку
-            const text = e.target.result;
-            const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-            
-            const wells = [];
-            for (let i = 1; i < lines.length; i++) {
-              const parts = lines[i].split('\t').map(p => p.trim());
-              if (parts.length >= 5) {
-                wells.push({
-                  well_id: parts,
-                  x_coord: parseFloat(parts),
-                  y_coord: parseFloat(parts),
-                  z_coord: parseFloat(parts),
-                  well_name: parts || `Скважина ${parts}`,
-                  total_depth: parseFloat(parts) || 0
-                });
-              }
-            }
-            
-            if (wells.length === 0) {
-              throw new Error('Нет валидных данных в файле');
-            }
-            
-            const added = await db.addWells(wells);
-            showNotification(`✓ Импортировано ${added} скважин`, 'success');
-            closeModal('uploadModal');
-            await updateStatistics();
-          } catch (error) {
-            showNotification(`❌ Ошибка: ${error.message}`, 'error');
-          } finally {
-            showLoading(false);
-          }
-        };
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
         
-        reader.readAsText(file);
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        
+        osc.frequency.value = 800;
+        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        
+        osc.start(audioContext.currentTime);
+        osc.stop(audioContext.currentTime + 0.1);
       } catch (error) {
-        console.error('Upload error:', error);
-        showNotification(`❌ Ошибка: ${error.message}`, 'error');
-        showLoading(false);
+        console.error('Beep error:', error);
       }
     }
 
     // ========== ДУБЛИКАТЫ ==========
     async function generateDuplicatesFromModal() {
-      const ratio = document.querySelector('#duplicatesModal select').value;
+      const ratio = document.getElementById('duplicateRatio').value;
       await generateDuplicates(ratio);
       closeModal('duplicatesModal');
     }
@@ -1157,7 +1279,7 @@
     }
 
     // ========== ЭКСПОРТ ==========
-    async function exportToExcel() {
+    async function exportToCSV() {
       showLoading(true);
       
       try {
@@ -1168,7 +1290,6 @@
           return;
         }
         
-        // Создаем CSV
         const headers = ['ID', 'Название', 'X', 'Y', 'Z', 'Глубина', 'Статус', 'Дата', 'Сотрудник'];
         const rows = wells.map(w => [
           w.well_id,
@@ -1176,7 +1297,7 @@
           w.x_coord.toFixed(2),
           w.y_coord.toFixed(2),
           w.z_coord.toFixed(2),
-          w.total_depth,
+          w.total_depth || '',
           w.sampling_status === 'sampled' ? 'Опробована' : 'Не опробована',
           w.sampled_at ? new Date(w.sampled_at).toLocaleString('ru-RU') : '',
           w.sampled_by || ''
@@ -1213,7 +1334,7 @@
           return;
         }
         
-        const headers = ['ID дубликата', 'Оригинальная проба', 'Кратность', 'Дата', 'Статус анализа'];
+        const headers = ['ID дубликата', 'Оригинальная проба', 'Кратность', 'Дата', 'Статус'];
         const rows = duplicates.map(d => [
           d.duplicate_id,
           d.original_sample_id,
@@ -1246,8 +1367,8 @@
     document.addEventListener('DOMContentLoaded', async () => {
       try {
         await db.init();
+        await initBarcodeScanner();
         
-        // Восстановление имени пользователя
         const saved = localStorage.getItem('userName');
         if (saved) {
           currentUser = saved;
@@ -1259,7 +1380,6 @@
           localStorage.setItem('userName', currentUser);
         });
         
-        // Статус соединения
         const updateStatus = () => {
           const status = navigator.onLine ? '✅ Онлайн' : '🔴 Офлайн';
           document.getElementById('connectionStatus').textContent = status;
@@ -1269,13 +1389,9 @@
         window.addEventListener('offline', updateStatus);
         updateStatus();
         
-        // Обновление статистики
         await updateStatistics();
-        
-        // Фокус на сканирование
         document.getElementById('barcodeInput').focus();
         
-        // Enter для сканирования
         document.getElementById('barcodeInput').addEventListener('keypress', (e) => {
           if (e.key === 'Enter') processScan();
         });
@@ -1287,7 +1403,6 @@
       }
     });
 
-    // Обновление каждые 30 сек
     setInterval(updateStatistics, 30000);
   </script>
 </body>
