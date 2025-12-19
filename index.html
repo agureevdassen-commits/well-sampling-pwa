@@ -66,12 +66,20 @@
     }
     .header h1 { font-size:18px; }
 
+    .header-right {
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      align-items:flex-end;
+    }
+
     .header-buttons {
       display:flex;
       gap:6px;
     }
     .header-btn {
-      padding:6px 10px;
+      min-height:40px;
+      padding:8px 12px;
       border-radius:4px;
       border:none;
       font-size:12px;
@@ -83,6 +91,19 @@
     }
     .header-btn:active {
       background:rgba(255,255,255,0.25);
+    }
+
+    .sync-indicator {
+      font-size:11px;
+      background:rgba(255,255,255,0.15);
+      padding:3px 8px;
+      border-radius:4px;
+    }
+    .sync-indicator.pending {
+      background:rgba(255,193,7,0.3);
+    }
+    .sync-indicator.ok {
+      background:rgba(40,167,69,0.3);
     }
 
     .main {
@@ -156,6 +177,7 @@
       gap:8px;
       margin-top:6px;
       flex:0 0 auto;
+      min-height:48px;
     }
 
     .input-row input,
@@ -186,6 +208,8 @@
     }
 
     .input-row button {
+      min-width:48px;
+      min-height:48px;
       padding:12px 16px;
       border:none;
       border-radius:6px;
@@ -254,7 +278,8 @@
       flex:0 0 auto;
     }
     .btn {
-      padding:9px 12px;
+      min-height:48px;
+      padding:10px 12px;
       border:none;
       border-radius:6px;
       font-size:13px;
@@ -273,6 +298,19 @@
       font-size:13px;
       margin-bottom:6px;
       flex:0 0 auto;
+    }
+
+    .filter-row {
+      display:flex;
+      gap:6px;
+      align-items:center;
+      font-size:11px;
+      margin-bottom:4px;
+    }
+    .filter-row label {
+      display:flex;
+      align-items:center;
+      gap:4px;
     }
 
     .wells-table {
@@ -364,6 +402,60 @@
 
     .hidden { display:none !important; }
 
+    /* Диагностика / модал */
+    .modal {
+      display:none;
+      position:fixed;
+      top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.5);
+      z-index:3000;
+      align-items:center;
+      justify-content:center;
+    }
+    .modal.active { display:flex; }
+    .modal-content {
+      background:#fff;
+      max-width:90%;
+      max-height:80vh;
+      border-radius:8px;
+      box-shadow:var(--shadow-lg);
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+    }
+    .modal-content h3 {
+      font-size:14px;
+      margin-bottom:6px;
+      border-bottom:2px solid var(--primary);
+      padding-bottom:4px;
+    }
+    .modal-close {
+      position:absolute;
+      top:8px;
+      right:8px;
+      width:28px;
+      height:28px;
+      border-radius:50%;
+      border:none;
+      background:#eee;
+      cursor:pointer;
+      font-size:18px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .log-area {
+      flex:1 1 auto;
+      min-height:0;
+      overflow:auto;
+      border:1px solid #ddd;
+      border-radius:4px;
+      padding:6px;
+      font-size:11px;
+      background:#fafafa;
+      white-space:pre-wrap;
+    }
+
     @media (max-width:900px) {
       .main {
         grid-template-columns:1fr;
@@ -377,9 +469,15 @@
   <div class="container">
     <div class="header">
       <h1>📷 Сканирование проб</h1>
-      <div class="header-buttons">
-        <button class="header-btn" onclick="toggleSamplesPanel()">📋 Пробы</button>
-        <button class="header-btn" onclick="toggleFooterStats()">📊 Статистика</button>
+      <div class="header-right">
+        <div class="header-buttons">
+          <button class="header-btn" onclick="toggleSamplesPanel()">📋 Пробы</button>
+          <button class="header-btn" onclick="toggleFooterStats()">📊 Статистика</button>
+          <button class="header-btn" onclick="openDiagnostics()">⚙ Диагностика</button>
+        </div>
+        <div id="syncIndicator" class="sync-indicator">
+          ⇅ Синхронизация: локально 0 / сервер ?
+        </div>
       </div>
     </div>
 
@@ -409,6 +507,8 @@
             type="text"
             placeholder="Скважина (ручной ввод)"
             autocomplete="off"
+            inputmode="numeric"
+            pattern="[0-9]*"
           >
         </div>
 
@@ -445,7 +545,7 @@
         </div>
       </div>
 
-      <!-- ПРАВО: список проб (скрываемый) -->
+      <!-- ПРАВО: список проб -->
       <div id="samplesPanel" class="card">
         <h3>Записанные пробы</h3>
 
@@ -456,6 +556,13 @@
           placeholder="Поиск по Sample или скважине..."
           oninput="filterScans()"
         >
+
+        <div class="filter-row">
+          <label>
+            <input type="checkbox" id="pendingOnlyCheckbox" onchange="filterScans()">
+            только несинхронизированные
+          </label>
+        </div>
 
         <div class="wells-table">
           <table>
@@ -511,11 +618,26 @@
           <strong id="lastBlockFooter">-</strong>
         </div>
       </div>
+      <div style="margin-top:6px; font-size:11px; color:#666;">
+        Версия: 1.0.0 PWA • Локальное хранилище + SQL синхронизация
+      </div>
     </div>
   </div>
 
   <div class="loading" id="loading">
     <div class="spinner"></div>
+  </div>
+
+  <!-- Модал диагностики -->
+  <div id="diagnosticsModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeDiagnostics()">✕</button>
+      <h3>Диагностика синхронизации</h3>
+      <div class="log-area" id="diagnosticsLog">
+        Журнал пуст.
+      </div>
+      <button class="btn btn-secondary" style="margin-top:6px;" onclick="clearDiagnosticsLog()">Очистить журнал</button>
+    </div>
   </div>
 
   <script>
@@ -553,7 +675,17 @@
         const deviceId = devices[devices.length - 1].deviceId;
         cameraActive = true;
         updateCameraStatus('scanning');
-        await codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
+
+        const constraints = {
+          video: {
+            deviceId: { exact: deviceId },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 10, max: 12 }
+          }
+        };
+
+        await codeReader.decodeFromConstraints(constraints, 'video', (result, err) => {
           if (result && cameraActive) {
             const code = result.getText();
             if (lastScannedBarcode !== code) {
@@ -585,7 +717,7 @@
         el.textContent = '⭕ Отключена';
         el.classList.add('inactive');
       } else if (state === 'error') {
-        el.textContent = '🔴 Ошибка';
+        el.textContent = '🔴 Ошибка камеры';
         el.classList.add('error');
       } else {
         el.textContent = '📹 Инициализация...';
@@ -622,6 +754,9 @@
               store.createIndex('sync_status', 'sync_status', { unique: false });
               store.createIndex('scanned_at', 'scanned_at', { unique: false });
             }
+            if (!db.objectStoreNames.contains('logs')) {
+              db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
+            }
           };
         });
       },
@@ -654,27 +789,59 @@
         });
       },
 
-      async markSynced(ids) {
+      async markSynced(ids, serverIds = []) {
         if (!ids.length) return;
         const tx = this.instance.transaction('scans', 'readwrite');
         const store = tx.objectStore('scans');
-        await Promise.all(ids.map(id => new Promise(res => {
+        await Promise.all(ids.map((id, i) => new Promise(res => {
           const req = store.get(id);
           req.onsuccess = () => {
             const rec = req.result;
             if (rec) {
               rec.sync_status = 'synced';
+              if (serverIds[i]) rec.server_id = serverIds[i];
               store.put(rec);
             }
             res();
           };
         })));
+      },
+
+      async addLog(entry) {
+        const tx = this.instance.transaction('logs', 'readwrite');
+        const store = tx.objectStore('logs');
+        store.add({
+          ...entry,
+          ts: Date.now()
+        });
+      },
+
+      async getLogs(limit = 100) {
+        const tx = this.instance.transaction('logs', 'readonly');
+        const store = tx.objectStore('logs');
+        return new Promise(resolve => {
+          const req = store.getAll();
+          req.onsuccess = () => {
+            const all = req.result || [];
+            resolve(all.slice(-limit));
+          };
+        });
+      },
+
+      async clearLogs() {
+        const tx = this.instance.transaction('logs', 'readwrite');
+        const store = tx.objectStore('logs');
+        return new Promise(resolve => {
+          const req = store.clear();
+          req.onsuccess = () => resolve();
+        });
       }
     };
 
     // UI & логика
     let currentUser = localStorage.getItem('scan_user') || 'Оператор';
     let allScans = [];
+    let lastServerCount = null;
 
     function showNotification(msg, type='info') {
       const el = document.createElement('div');
@@ -701,6 +868,7 @@
       allScans = await db.getAllScans();
       renderScans(allScans);
       updateStats(allScans);
+      updateSyncIndicator();
     }
 
     function renderScans(scans) {
@@ -713,7 +881,7 @@
       }
       tbody.innerHTML = scans.slice().reverse().map(s => `
         <tr>
-          <td><strong>${s.sample}</strong></td>
+          <td><strong>${s.sample}</strong>${s.server_id ? `<br><span style="font-size:9px;color:#999;">#${s.server_id}</span>` : ''}</td>
           <td style="font-size:11px;">${s.well_name || ''}</td>
           <td style="font-size:11px;">${s.type || ''} / ${s.block || ''}</td>
           <td style="font-size:11px;">${new Date(s.scanned_at).toLocaleString('ru-RU')}</td>
@@ -737,7 +905,12 @@
 
     function filterScans() {
       const q = document.getElementById('searchInput').value.toLowerCase();
-      const scans = allScans.filter(s =>
+      const pendingOnly = document.getElementById('pendingOnlyCheckbox').checked;
+      let scans = allScans;
+      if (pendingOnly) {
+        scans = scans.filter(s => s.sync_status === 'pending');
+      }
+      scans = scans.filter(s =>
         !q ||
         (s.sample && s.sample.toLowerCase().includes(q)) ||
         (s.well_name && s.well_name.toLowerCase().includes(q))
@@ -790,9 +963,13 @@
 
         await refreshScans();
         await syncPendingScans();
+
+        // автофокус обратно на Sample
+        document.getElementById('sampleInput').focus();
         await startCamera();
       } catch (e) {
         console.error(e);
+        await db.addLog({ level:'error', message:`processScan: ${e.message}` });
         updateScanResult('error', `❌ Ошибка: ${e.message}`);
         showNotification(`❌ Ошибка: ${e.message}`, 'error');
       } finally {
@@ -825,7 +1002,7 @@
           showNotification('⚠️ Нет данных для экспорта', 'info');
           return;
         }
-        const headers = ['Sample','Скважина','Тип','Блок','Дата','Сотрудник','SyncStatus'];
+        const headers = ['Sample','Скважина','Тип','Блок','Дата','Сотрудник','SyncStatus','ServerID'];
         const rows = scans.map(s => [
           s.sample,
           s.well_name || '',
@@ -833,7 +1010,8 @@
           s.block || '',
           new Date(s.scanned_at).toLocaleString('ru-RU'),
           s.scanned_by || '',
-          s.sync_status || ''
+          s.sync_status || '',
+          s.server_id || ''
         ]);
         const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
         const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
@@ -844,6 +1022,7 @@
         a.click();
         showNotification('✓ CSV выгружен (локально)', 'success');
       } catch (e) {
+        await db.addLog({ level:'error', message:`exportToCSV: ${e.message}` });
         showNotification(`❌ Ошибка: ${e.message}`, 'error');
       } finally {
         showLoading(false);
@@ -851,10 +1030,16 @@
     }
 
     async function syncPendingScans() {
-      if (!navigator.onLine) return;
+      if (!navigator.onLine) {
+        updateSyncIndicator();
+        return;
+      }
       try {
         const pending = await db.getPendingScans();
-        if (!pending.length) return;
+        if (!pending.length) {
+          updateSyncIndicator(0);
+          return;
+        }
 
         const deviceId = localStorage.getItem('device_id') ||
           (function () {
@@ -870,7 +1055,8 @@
           block: p.block,
           type: p.type,
           scanned_at: p.scanned_at,
-          scanned_by: p.scanned_by
+          scanned_by: p.scanned_by,
+          local_id: p.id
         }));
 
         const res = await fetch(API_URL, {
@@ -880,12 +1066,68 @@
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
 
-        await db.markSynced(pending.map(p => p.id));
+        let serverResponse = {};
+        try {
+          serverResponse = await res.json();
+        } catch (_) {}
+
+        // предполагаем, что сервер может вернуть массив server_ids по порядку
+        const serverIds = serverResponse.server_ids || [];
+        await db.markSynced(pending.map(p => p.id), serverIds);
         await refreshScans();
+        await db.addLog({ level:'info', message:`sync ok: ${pending.length}` });
         showNotification(`✓ Синхронизировано: ${pending.length}`, 'success');
       } catch (e) {
         console.error('Sync error', e);
+        await db.addLog({ level:'error', message:`syncPendingScans: ${e.message}` });
+      } finally {
+        updateSyncIndicator();
       }
+    }
+
+    async function updateSyncIndicator() {
+      const indicator = document.getElementById('syncIndicator');
+      const scans = allScans;
+      const localCount = scans.length;
+      const pendingCount = scans.filter(s => s.sync_status === 'pending').length;
+      let text = `⇅ Синхронизация: локально ${localCount}`;
+      if (pendingCount > 0) {
+        text += `, в ожидании ${pendingCount}`;
+        indicator.classList.add('pending');
+        indicator.classList.remove('ok');
+      } else {
+        text += `, всё отправлено`;
+        indicator.classList.add('ok');
+        indicator.classList.remove('pending');
+      }
+      if (lastServerCount != null) {
+        text += ` / сервер ${lastServerCount}`;
+      }
+      indicator.textContent = text;
+    }
+
+    // Диагностика
+    async function openDiagnostics() {
+      const logs = await db.getLogs();
+      const box = document.getElementById('diagnosticsLog');
+      if (!logs.length) {
+        box.textContent = 'Журнал пуст.';
+      } else {
+        box.textContent = logs.map(l =>
+          `${new Date(l.ts).toLocaleString('ru-RU')} [${l.level}]: ${l.message}`
+        ).join('\n');
+      }
+      document.getElementById('diagnosticsModal').classList.add('active');
+    }
+
+    function closeDiagnostics() {
+      document.getElementById('diagnosticsModal').classList.remove('active');
+    }
+
+    async function clearDiagnosticsLog() {
+      await db.clearLogs();
+      document.getElementById('diagnosticsLog').textContent = 'Журнал пуст.';
+      showNotification('Журнал очищен', 'info');
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -915,9 +1157,13 @@
         });
 
         const updateConn = () => {
-          document.getElementById('connectionStatus').textContent =
-            navigator.onLine ? '✅ Онлайн' : '🔴 Офлайн';
-          if (navigator.onLine) syncPendingScans();
+          const el = document.getElementById('connectionStatus');
+          if (navigator.onLine) {
+            el.textContent = '✅ Онлайн (данные синхронизируются)';
+            syncPendingScans();
+          } else {
+            el.textContent = '🔴 Офлайн (записи сохраняются в телефоне)';
+          }
         };
         window.addEventListener('online', updateConn);
         window.addEventListener('offline', updateConn);
@@ -928,8 +1174,10 @@
         });
 
         await refreshScans();
+        document.getElementById('sampleInput').focus();
       } catch (e) {
         console.error(e);
+        await db.addLog({ level:'error', message:`init: ${e.message}` });
         showNotification('❌ Ошибка инициализации', 'error');
       }
     });
