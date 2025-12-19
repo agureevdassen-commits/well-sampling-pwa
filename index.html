@@ -142,55 +142,31 @@
       right: 8px;
       background: rgba(0, 0, 0, 0.7);
       color: white;
-      padding: 4px 8px;
+      padding: 6px 10px;
       border-radius: 4px;
       font-size: 11px;
+      font-weight: 600;
     }
 
-    .camera-status.active {
-      background: rgba(40, 167, 69, 0.9);
+    .camera-status.scanning {
+      background: rgba(40, 167, 69, 0.95);
+      animation: pulse 1.5s infinite;
+    }
+
+    .camera-status.inactive {
+      background: rgba(100, 100, 100, 0.8);
     }
 
     .camera-status.error {
-      background: rgba(220, 53, 69, 0.9);
+      background: rgba(220, 53, 69, 0.95);
     }
 
-    .camera-controls {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
     }
 
-    .camera-controls button {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-camera {
-      background: var(--primary);
-      color: white;
-    }
-
-    .btn-camera:active {
-      background: #5a67d8;
-      transform: scale(0.98);
-    }
-
-    .btn-camera.recording {
-      background: var(--danger);
-    }
-
-    .btn-camera:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
+    /* ===== ВВОД ШТРИХКОДА ===== */
     .scanner-input {
       display: flex;
       gap: 8px;
@@ -202,14 +178,22 @@
       padding: 12px;
       border: 2px solid #ddd;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 16px;
       text-align: center;
+      font-weight: 600;
+      transition: all 0.2s;
     }
 
     .scanner-input input:focus {
       outline: none;
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      background: #f0f7ff;
+    }
+
+    .scanner-input input.filled {
+      border-color: var(--primary);
+      background: #f0f7ff;
     }
 
     .scanner-input button {
@@ -228,6 +212,12 @@
       background: #5a67d8;
     }
 
+    .scanner-input button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ===== РЕЗУЛЬТАТ СКАНИРОВАНИЯ ===== */
     .scanner-result {
       background: #f0f0f0;
       padding: 12px;
@@ -238,6 +228,7 @@
       align-items: center;
       justify-content: center;
       color: #999;
+      transition: all 0.3s;
     }
 
     .scanner-result.success {
@@ -252,6 +243,13 @@
       border-left: 4px solid var(--danger);
     }
 
+    .scanner-result.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border-left: 4px solid var(--info);
+    }
+
+    /* ===== СТАТИСТИКА ===== */
     .scanner-stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -331,11 +329,6 @@
 
     .btn-secondary:active {
       background: #e9ecef;
-    }
-
-    .btn-danger {
-      background: var(--danger);
-      color: white;
     }
 
     /* ===== ТАБЛИЦА СКВАЖИН ===== */
@@ -525,10 +518,6 @@
         grid-template-columns: 1fr;
         padding: 12px;
       }
-
-      .header-stats {
-        grid-template-columns: repeat(3, 1fr);
-      }
     }
 
     @media (max-width: 768px) {
@@ -539,19 +528,6 @@
       .header-stats {
         grid-template-columns: repeat(2, 1fr);
         font-size: 11px;
-      }
-
-      .card {
-        padding: 12px;
-      }
-
-      .card h3 {
-        font-size: 13px;
-      }
-
-      .scanner-result {
-        min-height: 60px;
-        font-size: 12px;
       }
 
       #video {
@@ -589,11 +565,6 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-
-    /* ===== СКРЫТИЕ ===== */
-    .hidden {
-      display: none !important;
-    }
   </style>
 </head>
 <body>
@@ -625,30 +596,24 @@
 
         <!-- Видео поток камеры -->
         <div class="camera-container">
-          <video id="video" playsinline></video>
-          <div class="camera-status" id="cameraStatus">📹 Камера</div>
+          <video id="video" playsinline autoplay muted></video>
+          <div class="camera-status" id="cameraStatus">📹 Инициализация...</div>
         </div>
 
-        <!-- Управление камерой -->
-        <div class="camera-controls">
-          <button class="btn-camera" id="startCameraBtn" onclick="startCamera()">▶ Включить камеру</button>
-          <button class="btn-camera" id="stopCameraBtn" onclick="stopCamera()" disabled>⏹ Выключить</button>
-        </div>
-
-        <!-- Ввод вручную -->
+        <!-- Ввод штрихкода -->
         <div class="scanner-input">
           <input 
             type="text" 
             id="barcodeInput" 
-            placeholder="Или введите ID скважины"
+            placeholder="Сканируйте или введите ID"
             autocomplete="off"
           >
-          <button onclick="processScan()">✓ Сканировать</button>
+          <button onclick="processScan()" id="scanBtn">✓ Сканировать</button>
         </div>
 
         <!-- Результат сканирования -->
         <div class="scanner-result" id="scanResult">
-          Результат сканирования
+          Ожидание сканирования...
         </div>
 
         <!-- Прогресс -->
@@ -790,26 +755,29 @@
     <div class="spinner"></div>
   </div>
 
-  <!-- Service Worker Registration & Scripts -->
   <script>
     // ========== PWA SETUP ==========
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js')
-        .then(reg => console.log('✓ Service Worker registered'))
         .catch(err => console.error('✗ Service Worker error:', err));
     }
 
-    // ========== BARCODE SCANNER SETUP ==========
+    // ========== CAMERA & BARCODE SCANNER ==========
     let codeReader = null;
-    let isScanning = false;
+    let cameraActive = false;
+    let lastScannedBarcode = null;
 
     async function initBarcodeScanner() {
       try {
         const ZXing = window.ZXing;
         codeReader = new ZXing.BrowserMultiFormatReader();
         console.log('✓ Barcode scanner initialized');
+        
+        // Автоматически включить камеру при инициализации
+        setTimeout(() => startCamera(), 500);
       } catch (error) {
         console.error('Barcode scanner init error:', error);
+        updateCameraStatus('error');
       }
     }
 
@@ -822,35 +790,31 @@
         
         if (cameras.length === 0) {
           showNotification('❌ Камера не найдена', 'error');
+          updateCameraStatus('error');
           return;
         }
 
-        const selectedDeviceId = cameras[cameras.length - 1].deviceId; // Задняя камера
-
-        isScanning = true;
-        document.getElementById('startCameraBtn').disabled = true;
-        document.getElementById('stopCameraBtn').disabled = false;
-        document.getElementById('cameraStatus').textContent = '🟢 Сканирует';
-        document.getElementById('cameraStatus').classList.add('active');
+        const selectedDeviceId = cameras[cameras.length - 1].deviceId;
+        cameraActive = true;
+        updateCameraStatus('scanning');
 
         await codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
-          if (result) {
-            handleBarcodeDetected(result.getText());
-          }
-          if (err && !(err instanceof ZXing.NotFoundException)) {
-            console.error('Scan error:', err);
+          if (result && cameraActive) {
+            const barcode = result.getText();
+            
+            // Предотвращаем повторное сканирование одного кода
+            if (lastScannedBarcode !== barcode) {
+              lastScannedBarcode = barcode;
+              handleBarcodeDetected(barcode);
+            }
           }
         });
 
-        showNotification('✓ Камера включена', 'success');
       } catch (error) {
         console.error('Camera error:', error);
         showNotification(`❌ Ошибка камеры: ${error.message}`, 'error');
-        document.getElementById('cameraStatus').textContent = '🔴 Ошибка';
-        document.getElementById('cameraStatus').classList.add('error');
-        document.getElementById('startCameraBtn').disabled = false;
-        document.getElementById('stopCameraBtn').disabled = true;
-        isScanning = false;
+        updateCameraStatus('error');
+        cameraActive = false;
       }
     }
 
@@ -858,17 +822,51 @@
       if (codeReader) {
         codeReader.reset();
       }
-      isScanning = false;
-      document.getElementById('startCameraBtn').disabled = false;
-      document.getElementById('stopCameraBtn').disabled = true;
-      document.getElementById('cameraStatus').textContent = '📹 Камера';
-      document.getElementById('cameraStatus').classList.remove('active', 'error');
-      showNotification('✓ Камера отключена', 'success');
+      cameraActive = false;
+      updateCameraStatus('inactive');
+    }
+
+    function updateCameraStatus(status) {
+      const statusEl = document.getElementById('cameraStatus');
+      
+      statusEl.classList.remove('scanning', 'inactive', 'error');
+      
+      switch(status) {
+        case 'scanning':
+          statusEl.textContent = '🟢 Сканирует';
+          statusEl.classList.add('scanning');
+          break;
+        case 'inactive':
+          statusEl.textContent = '⭕ Отключена';
+          statusEl.classList.add('inactive');
+          break;
+        case 'error':
+          statusEl.textContent = '🔴 Ошибка';
+          statusEl.classList.add('error');
+          break;
+        default:
+          statusEl.textContent = '📹 Инициализация...';
+      }
     }
 
     function handleBarcodeDetected(barcode) {
-      document.getElementById('barcodeInput').value = barcode;
-      processScan();
+      const barcodeInput = document.getElementById('barcodeInput');
+      
+      // Если поле уже заполнено, не заполняем его снова
+      if (barcodeInput.value) {
+        return;
+      }
+
+      // Заполняем поле
+      barcodeInput.value = barcode;
+      barcodeInput.classList.add('filled');
+      
+      // Отключаем камеру
+      stopCamera();
+      
+      // Показываем информацию
+      updateScanResult('info', `Отсканировано: ${barcode}`);
+      showNotification(`📷 Обнаружен: ${barcode}`, 'info');
     }
 
     // ========== DATABASE INITIALIZATION ==========
@@ -1052,6 +1050,12 @@
       showModal('duplicatesModal');
     }
 
+    function updateScanResult(type, message) {
+      const resultEl = document.getElementById('scanResult');
+      resultEl.className = `scanner-result ${type}`;
+      resultEl.textContent = message;
+    }
+
     // ========== СТАТИСТИКА ==========
     async function updateStatistics() {
       try {
@@ -1179,36 +1183,40 @@
         const well = allWells.find(w => w.well_id === barcode);
         
         if (!well) {
-          document.getElementById('scanResult').innerHTML = '❌ Скважина не найдена';
-          document.getElementById('scanResult').className = 'scanner-result error';
+          updateScanResult('error', '❌ Скважина не найдена');
           showNotification('❌ Скважина не найдена', 'error');
           document.getElementById('barcodeInput').value = '';
+          document.getElementById('barcodeInput').classList.remove('filled');
+          lastScannedBarcode = null;
+          
+          // Включаем камеру снова
+          await startCamera();
           return;
         }
 
         await db.updateWellStatus(well.well_id, currentUser);
         await db.addLog(well.well_id, well.well_name, currentUser);
         
-        document.getElementById('scanResult').innerHTML = `
-          <div>
-            <strong>✓ Успешно!</strong><br>
-            ${well.well_name}<br>
-            ID: ${well.well_id}
-          </div>
-        `;
-        document.getElementById('scanResult').className = 'scanner-result success';
+        updateScanResult('success', `✓ Успешно!\n${well.well_name}\nID: ${well.well_id}`);
         
         playBeep();
         if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
         
         showNotification(`✓ ${well.well_name} опробована`, 'success');
         
+        // Очищаем поле
         document.getElementById('barcodeInput').value = '';
-        document.getElementById('barcodeInput').focus();
+        document.getElementById('barcodeInput').classList.remove('filled');
+        lastScannedBarcode = null;
         
         await updateStatistics();
+        
+        // Включаем камеру снова для следующего сканирования
+        await startCamera();
+        
       } catch (error) {
         console.error('Scan error:', error);
+        updateScanResult('error', `❌ Ошибка: ${error.message}`);
         showNotification(`❌ Ошибка: ${error.message}`, 'error');
       } finally {
         showLoading(false);
@@ -1390,8 +1398,8 @@
         updateStatus();
         
         await updateStatistics();
-        document.getElementById('barcodeInput').focus();
         
+        // Enter для сканирования
         document.getElementById('barcodeInput').addEventListener('keypress', (e) => {
           if (e.key === 'Enter') processScan();
         });
