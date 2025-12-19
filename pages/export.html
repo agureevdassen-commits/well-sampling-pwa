@@ -1,0 +1,220 @@
+<div class="page-export">
+  <header class="page-header">
+    <h1>📥 Экспорт данных</h1>
+  </header>
+
+  <div class="content">
+    <div class="card">
+      <div class="card-header">📊 Экспортировать паспорт опробования</div>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">Скачать полный паспорт опробования скважин с информацией об опробовании</p>
+      <button class="btn btn-primary btn-block" onclick="exportPassport()">📥 Экспорт в Excel</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🔄 Экспортировать дубликаты</div>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">Скачать список контрольных проб для передачи в лабораторию</p>
+      <button class="btn btn-primary btn-block" onclick="exportDuplicates()">📥 Экспорт дубликатов</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📋 Экспортировать журнал действий</div>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">Скачать полный журнал всех сканирований и действий</p>
+      <button class="btn btn-primary btn-block" onclick="exportLogs()">📥 Экспорт логов</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">💾 Резервная копия приложения</div>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">Сохранить все данные приложения для резервного копирования</p>
+      <button class="btn btn-secondary btn-block" onclick="backupData()">💾 Создать резервную копию</button>
+      <label style="display: block; margin-top: 12px;">Или загрузить резервную копию:</label>
+      <input type="file" id="backupFile" accept=".json" style="width: 100%; margin: 8px 0;">
+      <button class="btn btn-secondary btn-block" onclick="restoreData()">📂 Восстановить из файла</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📊 Статистика экспорта</div>
+      <div id="exportStats" style="font-size: 12px; color: #666;">
+        <p id="totalWellsExport">Всего скважин: 0</p>
+        <p id="sampledWellsExport">Опробовано: 0</p>
+        <p id="duplicatesExport">Дубликатов: 0</p>
+        <p id="logsExport">Логов: 0</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.page-export { padding: 12px; }
+
+.page-header {
+  padding: 12px 0;
+  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: 16px;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+</style>
+
+<script>
+// Обновление статистики
+(async () => {
+  try {
+    const wells = await db.getAllWells();
+    const duplicates = await db.getAllDuplicates();
+    const logs = await db.getLogs(1000);
+    const sampled = wells.filter(w => w.sampling_status === 'sampled').length;
+
+    document.getElementById('totalWellsExport').textContent = `Всего скважин: ${wells.length}`;
+    document.getElementById('sampledWellsExport').textContent = `Опробовано: ${sampled}`;
+    document.getElementById('duplicatesExport').textContent = `Дубликатов: ${duplicates.length}`;
+    document.getElementById('logsExport').textContent = `Логов: ${logs.length}`;
+  } catch (error) {
+    console.error('Error loading export stats:', error);
+  }
+})();
+
+async function exportPassport() {
+  await exportToExcel();
+}
+
+async function exportDuplicates() {
+  try {
+    showLoading(true);
+    
+    const duplicates = await db.getAllDuplicates();
+    
+    if (duplicates.length === 0) {
+      showNotification('⚠️ Нет дубликатов для экспорта', 'warning');
+      return;
+    }
+
+    const data = duplicates.map(dup => ({
+      'ID дубликата': dup.duplicate_id,
+      'ID оригинальной пробы': dup.original_sample_id,
+      'Кратность': dup.duplicate_ratio,
+      'Дата создания': formatDate(dup.created_at),
+      'Статус анализа': dup.analysis_status === 'analyzed' ? 'Проанализирован' : 'Не проанализирован'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Дубликаты');
+
+    const fileName = `Дубликаты_${new Date().toISOString().split('T')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    showNotification('✓ Дубликаты экспортированы', 'success');
+    
+  } catch (error) {
+    showNotification(`❌ Ошибка: ${error.message}`, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function exportLogs() {
+  try {
+    showLoading(true);
+    
+    const logs = await db.getLogs(1000);
+    
+    if (logs.length === 0) {
+      showNotification('⚠️ Нет логов для экспорта', 'warning');
+      return;
+    }
+
+    const data = logs.map(log => ({
+      'ID скважины': log.wellId,
+      'Название скважины': log.wellName,
+      'Сотрудник': log.userName,
+      'Действие': log.action,
+      'Дата и время': formatDate(log.timestamp)
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Логи');
+
+    const fileName = `Логи_${new Date().toISOString().split('T')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    showNotification('✓ Логи экспортированы', 'success');
+    
+  } catch (error) {
+    showNotification(`❌ Ошибка: ${error.message}`, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function backupData() {
+  try {
+    showLoading(true);
+    
+    const backup = await db.exportToJSON();
+    
+    const dataStr = JSON.stringify(backup, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `backup_${new Date().toISOString().split('T')}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    showNotification('✓ Резервная копия создана', 'success');
+    
+  } catch (error) {
+    showNotification(`❌ Ошибка: ${error.message}`, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function restoreData() {
+  const file = document.getElementById('backupFile').files;
+  
+  if (!file) {
+    showNotification('⚠️ Выберите файл для восстановления', 'warning');
+    return;
+  }
+
+  if (!confirm('⚠️ Это действие перезапишет все текущие данные! Продолжить?')) {
+    return;
+  }
+
+  try {
+    showLoading(true);
+
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const backup = JSON.parse(e.target.result);
+        await db.importFromJSON(backup);
+        showNotification('✓ Данные восстановлены', 'success');
+        location.reload();
+      } catch (error) {
+        showNotification(`❌ Ошибка восстановления: ${error.message}`, 'error');
+      } finally {
+        showLoading(false);
+      }
+    };
+
+    reader.readAsText(file);
+
+  } catch (error) {
+    showNotification(`❌ Ошибка: ${error.message}`, 'error');
+    showLoading(false);
+  }
+}
+</script>

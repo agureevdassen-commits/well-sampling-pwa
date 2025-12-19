@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#667eea">
+  <meta name="description" content="Система управления паспортом опробования скважин">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Опробование">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- Icons -->
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/styles/main.css">
+  <link rel="stylesheet" href="/styles/responsive.css">
+  
+  <title>Паспорт опробования скважин</title>
+</head>
+<body>
+  <!-- App Container -->
+  <div id="app" class="app-container">
+    <!-- Navigation -->
+    <nav class="bottom-nav">
+      <a href="/pages/home.html" class="nav-item active" data-page="home">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Главная</span>
+      </a>
+      <a href="/pages/scanner.html" class="nav-item" data-page="scanner">
+        <span class="nav-icon">📷</span>
+        <span class="nav-label">Сканер</span>
+      </a>
+      <a href="/pages/samples.html" class="nav-item" data-page="samples">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Пробы</span>
+      </a>
+      <a href="/pages/duplicates.html" class="nav-item" data-page="duplicates">
+        <span class="nav-icon">🔄</span>
+        <span class="nav-label">Дубликаты</span>
+      </a>
+      <a href="/pages/export.html" class="nav-item" data-page="export">
+        <span class="nav-icon">📥</span>
+        <span class="nav-label">Экспорт</span>
+      </a>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="main-content">
+      <!-- Будет заполнено JavaScript -->
+    </main>
+  </div>
+
+  <!-- Install Prompt -->
+  <div id="install-prompt" class="install-prompt">
+    <div class="install-content">
+      <div class="install-icon">📱</div>
+      <div class="install-text">
+        <h3>Установить приложение</h3>
+        <p>Быстрый доступ со значком на рабочем столе</p>
+      </div>
+      <button id="install-btn" class="install-btn">Установить</button>
+      <button class="install-close" onclick="closeInstallPrompt()">✕</button>
+    </div>
+  </div>
+
+  <!-- Update Notification -->
+  <div id="update-notification" class="update-notification">
+    <div class="update-content">
+      <span>Доступно обновление приложения</span>
+      <button onclick="updateServiceWorker()" class="btn-update">Обновить</button>
+    </div>
+  </div>
+
+  <!-- Sync Status Indicator -->
+  <div id="sync-indicator" class="sync-indicator">
+    <span id="sync-status" class="sync-status"></span>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div id="loading-spinner" class="loading-spinner hidden">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/utils.js"></script>
+  <script src="js/database.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+    // ========== PWA INSTALLATION ==========
+    let deferredPrompt;
+    const installBtn = document.getElementById('install-btn');
+    const installPrompt = document.getElementById('install-prompt');
+
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installPrompt.style.display = 'flex';
+      console.log('Install prompt available');
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response: ${outcome}`);
+        deferredPrompt = null;
+        closeInstallPrompt();
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('App installed');
+      deferredPrompt = null;
+      closeInstallPrompt();
+      showNotification('✓ Приложение успешно установлено!', 'success');
+    });
+
+    function closeInstallPrompt() {
+      installPrompt.style.display = 'none';
+    }
+
+    // ========== SERVICE WORKER REGISTRATION ==========
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(registration => {
+          console.log('Service Worker registered:', registration);
+
+          // Проверка обновлений каждые 30 секунд
+          setInterval(() => {
+            registration.update();
+          }, 30000);
+
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                document.getElementById('update-notification').style.display = 'block';
+                console.log('Update available');
+              }
+            });
+          });
+        })
+        .catch(error => {
+          console.error('Service Worker registration failed:', error);
+        });
+
+      // Получение сообщений от Service Worker
+      navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data.type === 'sync-complete') {
+          showNotification(
+            `✓ Синхронизировано ${event.data.count} проб`,
+            'success'
+          );
+          location.reload();
+        }
+      });
+    }
+
+    // ========== UPDATE SERVICE WORKER ==========
+    function updateServiceWorker() {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+        window.location.reload();
+      }
+    }
+
+    // ========== OFFLINE/ONLINE DETECTION ==========
+    window.addEventListener('online', () => {
+      console.log('Back online');
+      showNotification('✓ Соединение восстановлено', 'success');
+      if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.sync.register('sync-samples');
+          registration.sync.register('sync-duplicates');
+        });
+      }
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('Offline');
+      showNotification('📡 Режим офлайн', 'warning');
+    });
+
+    // ========== INITIALIZATION ==========
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        // Инициализируем БД
+        await db.init();
+        console.log('App initialized');
+
+        // Загружаем главную страницу
+        await loadPage('home');
+
+        // Обновляем статистику
+        await updateStatistics();
+      } catch (error) {
+        console.error('Initialization error:', error);
+        showNotification('❌ Ошибка инициализации', 'error');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<div class="page-scanner">
+  <header class="page-header">
+    <h1>📷 Сканирование</h1>
+  </header>
+
+  <div class="content">
+    <div class="scanner-preview" id="scannerPreview">
+      <div style="text-align: center; padding: 40px; background: #f0f0f0; border-radius: 8px;">
+        <div style="font-size: 48px; margin-bottom: 12px;">📷</div>
+        <p>Введите штрихкод вручную</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📝 Ввод штрихкода</div>
+      <input type="text" id="barcodeInput" placeholder="Отсканируйте или введите штрихкод" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;">
+      <button class="btn btn-primary btn-block" onclick="processScan()">✓ Подтвердить</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header" id="resultHeader">Результат</div>
+      <div id="resultContent" style="text-align: center; color: #999; padding: 20px;">
+        Отсканированные скважины появятся здесь
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📊 Статистика сканирования</div>
+      <div class="flex-between mb-2">
+        <span>Сканировано сегодня:</span>
+        <strong id="scannedToday">0</strong>
+      </div>
+      <div class="flex-between mb-2">
+        <span>Всего опробовано:</span>
+        <strong id="totalScanned">0</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.page-scanner { padding: 12px; }
+
+.page-header {
+  padding: 12px 0;
+  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: 16px;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scanner-preview {
+  margin-bottom: 12px;
+}
+
+#barcodeInput {
+  font-size: 18px !important;
+  text-align: center;
+}
+
+.result-success {
+  background: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.result-error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+}
+</style>
+
+<script>
+// Фокус на поле ввода
+document.getElementById('barcodeInput').focus();
+
+// Обновление статистики
+(async () => {
+  const stats = await db.getStatistics();
+  document.getElementById('totalScanned').textContent = stats.sampledWells;
+
+  const today = new Date().toISOString().split('T');
+  const logs = await db.getLogs();
+  const todayLogs = logs.filter(log => 
+    new Date(log.timestamp).toISOString().split('T') === today
+  );
+  document.getElementById('scannedToday').textContent = todayLogs.length;
+})();
+
+// Обработка сканирования
+async function processScan() {
+  const barcode = document.getElementById('barcodeInput').value.trim();
+  
+  if (!barcode) {
+    showNotification('⚠️ Введите штрихкод', 'warning');
+    return;
+  }
+
+  try {
+    showLoading(true);
+
+    const wells = await db.getAllWells();
+    const well = wells.find(w => w.well_id === barcode || w.barcode === barcode);
+
+    if (!well) {
+      showNotification(`❌ Скважина ${barcode} не найдена`, 'error');
+      document.getElementById('barcodeInput').value = '';
+      document.getElementById('barcodeInput').focus();
+      return;
+    }
+
+    // Обновление статуса
+    await db.updateWellStatus(well.well_id, 'sampled', currentUser);
+    await db.addLog(well.well_id, well.well_name, currentUser, 'scan');
+
+    // Обновление localStorage
+    const allWells = await db.getAllWells();
+    localStorage.setItem('wells', JSON.stringify(allWells));
+
+    // Обновление UI
+    const resultContent = document.getElementById('resultContent');
+    resultContent.innerHTML = `
+      <div class="result-success">
+        <strong>✓ Успешно!</strong><br>
+        Скважина: ${well.well_name}<br>
+        ID: ${well.well_id}<br>
+        Статус: Опробована
+      </div>
+    `;
+    document.getElementById('resultHeader').textContent = '✓ Результат';
+
+    // Звуковая и тактильная обратная связь
+    playBeep();
+    if ('vibrate' in navigator) {
+      navigator.vibrate([100, 50, 100]);
+    }
+
+    showNotification(`✓ ${well.well_name} отмечена`, 'success');
+
+    // Очистка ввода
+    setTimeout(() => {
+      document.getElementById('barcodeInput').value = '';
+      document.getElementById('barcodeInput').focus();
+      
+      // Обновление статистики
+      (async () => {
+        const stats = await db.getStatistics();
+        document.getElementById('totalScanned').textContent = stats.sampledWells;
+        
+        const today = new Date().toISOString().split('T');
+        const logs = await db.getLogs();
+        const todayLogs = logs.filter(log => 
+          new Date(log.timestamp).toISOString().split('T') === today
+        );
+        document.getElementById('scannedToday').textContent = todayLogs.length;
+      })();
+    }, 1000);
+
+  } catch (error) {
+    console.error('Scan error:', error);
+    showNotification(`❌ Ошибка: ${error.message}`, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// Звуковой сигнал
+function playBeep() {
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  oscillator.frequency.value = 800;
+  oscillator.type = 'sine';
+
+  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+  oscillator.start(audioContext.currentTime);
+  oscillator.stop(audioContext.currentTime + 0.1);
+}
+
+// Обработка Enter
+document.getElementById('barcodeInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    processScan();
+  }
+});
+</script>

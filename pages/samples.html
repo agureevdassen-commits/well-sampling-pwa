@@ -1,0 +1,173 @@
+<div class="page-samples">
+  <header class="page-header">
+    <h1>📊 Список проб</h1>
+  </header>
+
+  <div class="content">
+    <div class="card">
+      <div class="card-header">🔍 Поиск и фильтры</div>
+      <input type="text" id="searchInput" placeholder="Поиск по ID или названию" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px;">
+      
+      <select id="filterStatus" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        <option value="all">📌 Все скважины</option>
+        <option value="sampled">✓ Опробованы</option>
+        <option value="not_sampled">○ Не опробованы</option>
+      </select>
+    </div>
+
+    <div id="wellsList" class="wells-list">
+      <div style="text-align: center; padding: 40px; color: #999;">
+        <div style="font-size: 32px; margin-bottom: 12px;">⏳</div>
+        <p>Загрузка...</p>
+      </div>
+    </div>
+
+    <div class="card text-center">
+      <div id="wellsCount">Всего: 0</div>
+    </div>
+  </div>
+</div>
+
+<style>
+.page-samples { padding: 12px; }
+
+.page-header {
+  padding: 12px 0;
+  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: 16px;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wells-list {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.well-item {
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.well-item:last-child {
+  border-bottom: none;
+}
+
+.well-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.well-info p {
+  margin: 2px 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.well-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.well-status.sampled {
+  background: #d4edda;
+  color: #155724;
+}
+
+.well-status.not_sampled {
+  background: #fff3cd;
+  color: #856404;
+}
+</style>
+
+<script>
+// Загрузка скважин
+(async () => {
+  try {
+    const wells = await db.getAllWells();
+    renderWells(wells);
+  } catch (error) {
+    console.error('Error loading samples:', error);
+  }
+})();
+
+function renderWells(wells) {
+  const wellsList = document.getElementById('wellsList');
+  
+  if (wells.length === 0) {
+    wellsList.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #999;">
+        <div style="font-size: 32px; margin-bottom: 12px;">🚫</div>
+        <p>Нет скважин. Загрузите DVG файл</p>
+      </div>
+    `;
+    document.getElementById('wellsCount').textContent = 'Всего: 0';
+    return;
+  }
+
+  wellsList.innerHTML = wells.map(well => `
+    <div class="well-item">
+      <div class="well-info">
+        <h3>${well.well_id}</h3>
+        <p>${well.well_name}</p>
+        <p>X: ${well.x_coord.toFixed(2)} Y: ${well.y_coord.toFixed(2)} Z: ${well.z_coord.toFixed(2)}</p>
+        <p>Глубина: ${well.total_depth} м</p>
+      </div>
+      <div class="well-status ${well.sampling_status}">
+        ${well.sampling_status === 'sampled' ? '✓ Опробована' : '○ Не опробована'}
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('wellsCount').textContent = `Всего: ${wells.length}`;
+}
+
+// Поиск
+document.getElementById('searchInput').addEventListener('input', async (e) => {
+  const query = e.target.value.trim();
+  let wells = await db.getAllWells();
+  
+  if (query) {
+    wells = wells.filter(w => 
+      w.well_id.toLowerCase().includes(query.toLowerCase()) ||
+      w.well_name.toLowerCase().includes(query.toLowerCase())
+    );
+  }
+
+  applyFilter(wells);
+});
+
+// Фильтр
+document.getElementById('filterStatus').addEventListener('change', async (e) => {
+  const status = e.target.value;
+  let wells = await db.getAllWells();
+  
+  if (status !== 'all') {
+    wells = wells.filter(w => w.sampling_status === status);
+  }
+
+  applyFilter(wells);
+});
+
+function applyFilter(wells) {
+  renderWells(wells);
+}
+</script>

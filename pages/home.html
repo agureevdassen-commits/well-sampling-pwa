@@ -1,0 +1,284 @@
+<div class="page-home">
+  <header class="page-header">
+    <h1>🏠 Главная</h1>
+  </header>
+
+  <div class="content">
+    <!-- Статистика -->
+    <div class="stats-section">
+      <div class="stat-card primary">
+        <div class="stat-icon">🔲</div>
+        <div class="stat-info">
+          <div class="stat-label">Всего скважин</div>
+          <div class="stat-value" id="totalWells">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card success">
+        <div class="stat-icon">✓</div>
+        <div class="stat-info">
+          <div class="stat-label">Опробовано</div>
+          <div class="stat-value" id="sampledWells">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card warning">
+        <div class="stat-icon">○</div>
+        <div class="stat-info">
+          <div class="stat-label">Не опробовано</div>
+          <div class="stat-value" id="unsampledWells">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card info">
+        <div class="stat-icon">📈</div>
+        <div class="stat-info">
+          <div class="stat-label">Процент выполнения</div>
+          <div class="stat-value" id="completionPercentage">0%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Прогресс бар -->
+    <div class="card">
+      <div class="card-header">Ход опробования</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+      <div class="progress-text" id="progressText">0 из 0</div>
+    </div>
+
+    <!-- Загрузка DVG файла -->
+    <div class="card">
+      <div class="card-header">📁 Загрузить реестр скважин (DVG)</div>
+      <input type="file" id="dvgFile" accept=".xlsx,.xls,.csv" style="width: 100%; margin: 8px 0;">
+      <button class="btn btn-primary btn-block" onclick="uploadDVG()">Загрузить файл</button>
+    </div>
+
+    <!-- Действия -->
+    <div class="card">
+      <div class="card-header">⚙️ Действия</div>
+      <button class="btn btn-secondary btn-block" onclick="startScanning()">📷 Начать сканирование</button>
+      <button class="btn btn-secondary btn-block" onclick="viewSamples()">📊 Просмотреть пробы</button>
+      <button class="btn btn-secondary btn-block" onclick="manageDuplicates()">🔄 Управлять дубликатами</button>
+    </div>
+
+    <!-- Синхронизация -->
+    <div class="card">
+      <div class="card-header">🔄 Синхронизация</div>
+      <div class="flex-between mb-2">
+        <span>Статус соединения:</span>
+        <span id="connectionStatus" class="badge badge-info">🔴 Проверка...</span>
+      </div>
+      <div class="flex-between mb-2">
+        <span>Несинхронизированные пробы:</span>
+        <span id="unsyncedCount" class="badge badge-warning">0</span>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="syncNow()">🔄 Синхронизировать</button>
+      <button class="btn btn-secondary btn-block" onclick="clearData()">🗑️ Очистить все данные</button>
+    </div>
+
+    <!-- Информация -->
+    <div class="card">
+      <div class="card-header">ℹ️ Информация</div>
+      <p class="mb-2"><strong>Версия:</strong> 1.0</p>
+      <p class="mb-2"><strong>Режим:</strong> <span id="modeIndicator">Офлайн</span></p>
+      <p class="mb-2"><strong>Пользователь:</strong> <input type="text" id="userNameInput" placeholder="Введите имя" style="width: 100%; padding: 6px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px;"></p>
+      <button class="btn btn-secondary btn-block" onclick="saveUserName()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.page-home { padding: 12px; }
+
+.page-header {
+  padding: 12px 0;
+  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: 16px;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stats-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  box-shadow: var(--shadow);
+}
+
+.stat-card.primary { border-left: 4px solid var(--primary-color); }
+.stat-card.success { border-left: 4px solid var(--success-color); }
+.stat-card.warning { border-left: 4px solid var(--warning-color); }
+.stat-card.info { border-left: 4px solid #667eea; }
+
+.stat-icon {
+  font-size: 24px;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.progress-text {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+</style>
+
+<script>
+// Загрузка при инициализации
+(async () => {
+  try {
+    const stats = await db.getStatistics();
+    
+    document.getElementById('totalWells').textContent = stats.totalWells;
+    document.getElementById('sampledWells').textContent = stats.sampledWells;
+    document.getElementById('unsampledWells').textContent = stats.unsampledWells;
+    document.getElementById('completionPercentage').textContent = stats.completionPercentage + '%';
+    
+    const progressFill = document.getElementById('progressFill');
+    progressFill.style.width = stats.completionPercentage + '%';
+    
+    document.getElementById('progressText').textContent = 
+      `${stats.sampledWells} из ${stats.totalWells}`;
+
+    // Восстановление имени пользователя
+    const savedName = localStorage.getItem('userName');
+    if (savedName) {
+      currentUser = savedName;
+      document.getElementById('userNameInput').value = savedName;
+    }
+
+    // Обновление статуса соединения
+    updateConnectionStatus();
+
+    // Обновление счетчика несинхронизированных проб
+    const unsynced = await db.getUnsyncedWells();
+    document.getElementById('unsyncedCount').textContent = unsynced.length;
+
+  } catch (error) {
+    console.error('Home page error:', error);
+  }
+})();
+
+function updateConnectionStatus() {
+  const status = navigator.onLine ? '✅ Онлайн' : '🔴 Офлайн';
+  const badge = document.getElementById('connectionStatus');
+  badge.textContent = status;
+  badge.className = navigator.onLine ? 'badge badge-success' : 'badge badge-danger';
+  
+  const modeIndicator = document.getElementById('modeIndicator');
+  modeIndicator.textContent = navigator.onLine ? 'Онлайн' : 'Офлайн';
+}
+
+function uploadDVG() {
+  const file = document.getElementById('dvgFile').files;
+  if (!file) {
+    showNotification('⚠️ Выберите файл', 'warning');
+    return;
+  }
+  importFromExcel(file);
+}
+
+function startScanning() {
+  loadPage('scanner');
+}
+
+function viewSamples() {
+  loadPage('samples');
+}
+
+function manageDuplicates() {
+  loadPage('duplicates');
+}
+
+async function syncNow() {
+  showNotification('🔄 Синхронизация...', 'info');
+  if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    const registration = await navigator.serviceWorker.ready;
+    try {
+      await registration.sync.register('sync-samples');
+      await registration.sync.register('sync-duplicates');
+      showNotification('✓ Синхронизация запущена', 'success');
+    } catch (error) {
+      showNotification(`❌ Ошибка: ${error.message}`, 'error');
+    }
+  } else {
+    showNotification('⚠️ Background Sync недоступен', 'warning');
+  }
+}
+
+async function clearData() {
+  if (confirm('❌ Вы уверены? Все данные будут удалены!')) {
+    try {
+      showLoading(true);
+      await db.clearAllData();
+      localStorage.clear();
+      showNotification('✓ Данные удалены', 'success');
+      location.reload();
+    } catch (error) {
+      showNotification(`❌ Ошибка: ${error.message}`, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+}
+
+function saveUserName() {
+  const name = document.getElementById('userNameInput').value.trim();
+  if (name) {
+    currentUser = name;
+    localStorage.setItem('userName', name);
+    showNotification(`✓ Имя сохранено: ${name}`, 'success');
+  } else {
+    showNotification('⚠️ Введите имя', 'warning');
+  }
+}
+
+// Отслеживание изменения статуса соединения
+window.addEventListener('online', updateConnectionStatus);
+window.addEventListener('offline', updateConnectionStatus);
+
+// Обновление каждые 30 секунд
+setInterval(async () => {
+  const stats = await db.getStatistics();
+  document.getElementById('totalWells').textContent = stats.totalWells;
+  document.getElementById('sampledWells').textContent = stats.sampledWells;
+  document.getElementById('completionPercentage').textContent = stats.completionPercentage + '%';
+  const progressFill = document.getElementById('progressFill');
+  progressFill.style.width = stats.completionPercentage + '%';
+  updateConnectionStatus();
+}, 30000);
+</script>

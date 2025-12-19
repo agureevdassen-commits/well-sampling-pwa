@@ -1,0 +1,205 @@
+<div class="page-duplicates">
+  <header class="page-header">
+    <h1>🔄 Управление дубликатами</h1>
+  </header>
+
+  <div class="content">
+    <div class="card">
+      <div class="card-header">➕ Создать дубликаты</div>
+      <label style="display: block; margin-bottom: 8px;">Кратность:</label>
+      <select id="duplicateRatio" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px;">
+        <option value="1:10">Каждая 10-я проба (1:10)</option>
+        <option value="1:20">Каждая 20-я проба (1:20)</option>
+        <option value="1:5">Каждая 5-я проба (1:5)</option>
+      </select>
+      <button class="btn btn-primary btn-block" onclick="createDuplicates()">Создать дубликаты</button>
+    </div>
+
+    <div id="duplicatesList" class="duplicates-list">
+      <div style="text-align: center; padding: 40px; color: #999;">
+        <div style="font-size: 32px; margin-bottom: 12px;">⏳</div>
+        <p>Загрузка...</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📥 Действия</div>
+      <button class="btn btn-secondary btn-block" onclick="exportDuplicates()">📥 Экспорт дубликатов Excel</button>
+      <button class="btn btn-danger btn-block" onclick="deletAllDuplicates()">🗑️ Удалить все дубликаты</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.page-duplicates { padding: 12px; }
+
+.page-header {
+  padding: 12px 0;
+  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: 16px;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.duplicates-list {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.duplicate-item {
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.duplicate-item:last-child {
+  border-bottom: none;
+}
+
+.duplicate-id {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.duplicate-info {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.duplicate-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.duplicate-actions button {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+</style>
+
+<script>
+// Загрузка дубликатов
+(async () => {
+  try {
+    const duplicates = await db.getAllDuplicates();
+    renderDuplicates(duplicates);
+  } catch (error) {
+    console.error('Error loading duplicates:', error);
+  }
+})();
+
+function renderDuplicates(duplicates) {
+  const list = document.getElementById('duplicatesList');
+  
+  if (duplicates.length === 0) {
+    list.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #999;">
+        <div style="font-size: 32px; margin-bottom: 12px;">📭</div>
+        <p>Нет дубликатов. Создайте их выше</p>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = duplicates.map(dup => `
+    <div class="duplicate-item">
+      <div class="duplicate-id">${dup.duplicate_id}</div>
+      <div class="duplicate-info">
+        <p><strong>Оригинальная проба:</strong> ${dup.original_sample_id}</p>
+        <p><strong>Кратность:</strong> ${dup.duplicate_ratio}</p>
+        <p><strong>Дата создания:</strong> ${formatDate(dup.created_at)}</p>
+        <p><strong>Статус:</strong> ${dup.analysis_status === 'analyzed' ? 'Проанализирован' : 'Не проанализирован'}</p>
+      </div>
+      <div class="duplicate-actions">
+        <button class="btn btn-secondary" onclick="deleteDuplicate('${dup.duplicate_id}')">🗑️ Удалить</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function createDuplicates() {
+  const ratio = document.getElementById('duplicateRatio').value;
+  await generateDuplicates(ratio);
+  
+  setTimeout(async () => {
+    const duplicates = await db.getAllDuplicates();
+    renderDuplicates(duplicates);
+  }, 500);
+}
+
+async function deleteDuplicate(duplicateId) {
+  if (confirm(`Удалить дубликат ${duplicateId}?`)) {
+    try {
+      await db.deleteDuplicate(duplicateId);
+      const duplicates = await db.getAllDuplicates();
+      renderDuplicates(duplicates);
+      showNotification('✓ Дубликат удален', 'success');
+    } catch (error) {
+      showNotification(`❌ Ошибка: ${error.message}`, 'error');
+    }
+  }
+}
+
+async function deletAllDuplicates() {
+  if (confirm('❌ Удалить ВСЕ дубликаты? Это действие необратимо!')) {
+    try {
+      const duplicates = await db.getAllDuplicates();
+      for (const dup of duplicates) {
+        await db.deleteDuplicate(dup.duplicate_id);
+      }
+      renderDuplicates([]);
+      showNotification('✓ Все дубликаты удалены', 'success');
+    } catch (error) {
+      showNotification(`❌ Ошибка: ${error.message}`, 'error');
+    }
+  }
+}
+
+async function exportDuplicates() {
+  try {
+    showLoading(true);
+    
+    const duplicates = await db.getAllDuplicates();
+    
+    if (duplicates.length === 0) {
+      showNotification('⚠️ Нет дубликатов для экспорта', 'warning');
+      return;
+    }
+
+    const data = duplicates.map(dup => ({
+      'ID дубликата': dup.duplicate_id,
+      'ID оригинальной пробы': dup.original_sample_id,
+      'Кратность': dup.duplicate_ratio,
+      'Дата создания': formatDate(dup.created_at),
+      'Статус анализа': dup.analysis_status === 'analyzed' ? 'Проанализирован' : 'Не проанализирован'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Дубликаты');
+
+    const fileName = `Дубликаты_${new Date().toISOString().split('T')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    showNotification('✓ Файл экспортирован', 'success');
+    
+  } catch (error) {
+    showNotification(`❌ Ошибка экспорта: ${error.message}`, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+</script>
