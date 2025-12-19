@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#667eea">
   <meta name="description" content="Сканирование проб (Sample / Скважина / Тип / Блок)">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -33,47 +33,64 @@
       --shadow-lg:0 8px 24px rgba(0,0,0,0.15);
     }
 
+    html, body {
+      height:100%;
+      overflow:hidden;
+    }
+
     body {
       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
       background:var(--bg);
       color:var(--dark);
-      height:100vh;
-      overflow:hidden;
+      -webkit-user-select:none;
+      -webkit-touch-callout:none;
     }
 
-    .container { display:flex; flex-direction:column; height:100vh; }
+    .container {
+      display:flex;
+      flex-direction:column;
+      height:100vh;
+      max-height:100vh;
+    }
 
     .header {
       background:linear-gradient(135deg,var(--primary) 0%,#764ba2 100%);
       color:#fff;
-      padding:12px 16px;
+      padding:10px 14px;
       box-shadow:var(--shadow);
+      flex:0 0 auto;
     }
     .header h1 { font-size:18px; }
 
     .main {
-      flex:1;
+      flex:1 1 auto;
       display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:12px;
-      padding:12px;
-      overflow-y:auto;
+      grid-template-columns:1.1fr 1.1fr;
+      gap:10px;
+      padding:10px;
+      overflow:hidden;
     }
 
     .card {
       background:var(--surface);
       border-radius:8px;
-      padding:12px;
+      padding:10px;
       box-shadow:var(--shadow);
+      display:flex;
+      flex-direction:column;
+      min-height:0;
     }
     .card h2, .card h3 {
       font-size:14px;
       margin-bottom:8px;
       border-bottom:2px solid var(--primary);
       padding-bottom:4px;
+      flex:0 0 auto;
     }
 
-    .scanner-panel { display:flex; flex-direction:column; gap:8px; }
+    .scanner-panel {
+      gap:8px;
+    }
 
     .camera-container {
       width:100%;
@@ -82,11 +99,11 @@
       overflow:hidden;
       background:#000;
       position:relative;
-      margin-bottom:8px;
+      flex:0 0 auto;
     }
     #video {
       width:100%;
-      height:200px;
+      height:190px;
       object-fit:cover;
       display:block;
     }
@@ -116,20 +133,25 @@
     .input-row {
       display:flex;
       gap:8px;
-      margin-bottom:6px;
+      margin-top:6px;
+      flex:0 0 auto;
     }
+
     .input-row input,
     .input-row select {
       flex:1;
-      padding:8px;
+      padding:12px;
       border:1px solid #ddd;
       border-radius:6px;
-      font-size:13px;
+      font-size:15px;
     }
+
     #sampleInput {
       border-width:2px;
       font-weight:600;
       text-align:center;
+      font-size:16px;
+      padding:14px;
     }
     #sampleInput:focus {
       outline:none;
@@ -143,12 +165,12 @@
     }
 
     .input-row button {
-      padding:8px 12px;
+      padding:12px 16px;
       border:none;
       border-radius:6px;
       background:var(--primary);
       color:#fff;
-      font-size:13px;
+      font-size:15px;
       font-weight:600;
       cursor:pointer;
       flex:0 0 auto;
@@ -161,14 +183,16 @@
     .scanner-result {
       background:#f0f0f0;
       border-radius:6px;
-      padding:8px;
-      min-height:60px;
-      font-size:12px;
+      padding:10px;
+      min-height:70px;
+      font-size:13px;
       color:#666;
       display:flex;
       align-items:center;
       justify-content:center;
       white-space:pre-line;
+      margin-top:6px;
+      flex:0 0 auto;
     }
     .scanner-result.success {
       background:#d4edda;
@@ -184,14 +208,15 @@
     .small-stats {
       display:flex;
       gap:8px;
-      margin-top:4px;
+      margin-top:6px;
+      flex:0 0 auto;
     }
     .small-stat {
       flex:1;
       background:var(--light);
       border-radius:4px;
       padding:6px 8px;
-      font-size:11px;
+      font-size:12px;
       text-align:center;
     }
     .small-stat strong {
@@ -205,9 +230,10 @@
       flex-direction:column;
       gap:6px;
       margin-top:6px;
+      flex:0 0 auto;
     }
     .btn {
-      padding:8px 12px;
+      padding:9px 12px;
       border:none;
       border-radius:6px;
       font-size:13px;
@@ -219,11 +245,21 @@
     .btn-secondary { background:var(--light); color:var(--dark); border:1px solid #ddd; }
     .btn-secondary:active { background:#e9ecef; }
 
-    .wells-table {
-      max-height:320px;
-      overflow-y:auto;
+    .search-box {
+      padding:8px 10px;
       border:1px solid #ddd;
       border-radius:6px;
+      font-size:13px;
+      margin-bottom:6px;
+      flex:0 0 auto;
+    }
+
+    .wells-table {
+      border:1px solid #ddd;
+      border-radius:6px;
+      overflow-y:auto;
+      flex:1 1 auto;
+      min-height:0;
     }
     .wells-table table {
       width:100%;
@@ -234,6 +270,7 @@
       background:var(--light);
       position:sticky;
       top:0;
+      z-index:1;
     }
     .wells-table th,
     .wells-table td {
@@ -244,16 +281,17 @@
     .wells-table tr:hover { background:#f8f9fa; }
 
     .footer-stats {
-      margin:8px 12px 12px;
+      margin:6px 10px 10px;
       background:var(--surface);
       border-radius:8px;
-      padding:8px 12px;
+      padding:8px 10px;
       box-shadow:var(--shadow);
+      flex:0 0 auto;
     }
     .footer-grid {
       display:grid;
       grid-template-columns:repeat(3,1fr);
-      gap:8px;
+      gap:6px;
       font-size:11px;
     }
     .footer-item {
@@ -298,15 +336,17 @@
     .notification.success { background:var(--success); }
     .notification.error { background:var(--danger); }
     .notification.info { background:var(--info); }
-
     @keyframes slideIn {
       from { transform:translateX(100%); opacity:0; }
       to { transform:translateX(0); opacity:1; }
     }
 
     @media (max-width:900px) {
-      .main { grid-template-columns:1fr; }
-      #video { height:160px; }
+      .main {
+        grid-template-columns:1fr;
+        grid-auto-rows:minmax(0,1fr);
+      }
+      #video { height:170px; }
     }
   </style>
 </head>
@@ -317,7 +357,7 @@
     </div>
 
     <div class="main">
-      <!-- ЛЕВАЯ ПАНЕЛЬ: сканер -->
+      <!-- ЛЕВО: сканирование -->
       <div class="card scanner-panel">
         <h2>Сканирование</h2>
 
@@ -374,13 +414,14 @@
         </div>
 
         <div class="btn-group">
-          <button class="btn btn-primary" onclick="exportToCSV()">📥 Экспорт CSV</button>
+          <button class="btn btn-primary" onclick="exportToCSV()">📥 Экспорт CSV (локально)</button>
         </div>
       </div>
 
-      <!-- ПРАВАЯ ПАНЕЛЬ: таблица -->
+      <!-- ПРАВО: список -->
       <div class="card">
         <h3>Записанные пробы</h3>
+
         <input
           id="searchInput"
           class="search-box"
@@ -388,6 +429,7 @@
           placeholder="Поиск по Sample или скважине..."
           oninput="filterScans()"
         >
+
         <div class="wells-table">
           <table>
             <thead>
@@ -407,14 +449,15 @@
             </tbody>
           </table>
         </div>
-        <small id="scansCount" style="display:block; margin-top:4px; color:#666;">Записей: 0</small>
 
-        <div style="margin-top:8px; font-size:12px;">
+        <small id="scansCount" style="margin-top:4px; color:#666;">Записей: 0</small>
+
+        <div style="margin-top:6px; font-size:12px;">
           <strong>Пользователь:</strong>
           <input
             id="userNameInput"
             type="text"
-            style="width:100%; padding:4px; margin-top:4px; border:1px solid #ddd; border-radius:4px;"
+            style="width:100%; padding:5px; margin-top:4px; border:1px solid #ddd; border-radius:4px;"
             placeholder="Имя оператора"
           >
           <div style="margin-top:4px;">
@@ -425,7 +468,6 @@
       </div>
     </div>
 
-    <!-- НИЖНЯЯ КАРТОЧКА СТАТИСТИКИ -->
     <div class="footer-stats">
       <div class="footer-grid">
         <div class="footer-item">
@@ -449,10 +491,9 @@
   </div>
 
   <script>
-    // Service Worker
+    // ===== Service Worker (offline-first) =====
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
-        .catch(console.error);
+      navigator.serviceWorker.register('/service-worker.js').catch(console.error);
     }
 
     // ===== CAMERA & BARCODE =====
@@ -465,7 +506,7 @@
         const ZXing = window.ZXing;
         codeReader = new ZXing.BrowserMultiFormatReader();
         console.log('Barcode scanner initialized');
-        setTimeout(() => startCamera(), 500);
+        setTimeout(() => startCamera(), 400);
       } catch (e) {
         console.error(e);
         updateCameraStatus('error');
@@ -481,7 +522,7 @@
           updateCameraStatus('error');
           return;
         }
-        const deviceId = devices[devices.length - 1].deviceId; // задняя
+        const deviceId = devices[devices.length - 1].deviceId;
         cameraActive = true;
         updateCameraStatus('scanning');
         await codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
@@ -495,8 +536,8 @@
         });
       } catch (e) {
         console.error(e);
-        updateCameraStatus('error');
         cameraActive = false;
+        updateCameraStatus('error');
       }
     }
 
@@ -533,9 +574,9 @@
       showNotification(`📷 Обнаружен: ${code}`, 'info');
     }
 
-    // ===== IndexedDB (SCANS) =====
+    // ===== IndexedDB (локальное хранилище) =====
     const db = {
-      name: 'sampling_scans_db',
+      name: 'sampling_scans_db_v2',
       instance: null,
 
       async init() {
@@ -549,7 +590,9 @@
           request.onupgradeneeded = (e) => {
             const db = e.target.result;
             if (!db.objectStoreNames.contains('scans')) {
-              db.createObjectStore('scans', { keyPath: 'id', autoIncrement: true });
+              const store = db.createObjectStore('scans', { keyPath: 'id', autoIncrement: true });
+              store.createIndex('sync_status', 'sync_status', { unique: false });
+              store.createIndex('scanned_at', 'scanned_at', { unique: false });
             }
           };
         });
@@ -571,10 +614,37 @@
           const req = store.getAll();
           req.onsuccess = () => resolve(req.result || []);
         });
+      },
+
+      async getPendingScans() {
+        const tx = this.instance.transaction('scans', 'readonly');
+        const store = tx.objectStore('scans');
+        const idx = store.index('sync_status');
+        return new Promise(resolve => {
+          const req = idx.getAll('pending');
+          req.onsuccess = () => resolve(req.result || []);
+        });
+      },
+
+      async markSynced(ids) {
+        if (!ids.length) return;
+        const tx = this.instance.transaction('scans', 'readwrite');
+        const store = tx.objectStore('scans');
+        await Promise.all(ids.map(id => new Promise(res => {
+          const req = store.get(id);
+          req.onsuccess = () => {
+            const rec = req.result;
+            if (rec) {
+              rec.sync_status = 'synced';
+              store.put(rec);
+            }
+            res();
+          };
+        })));
       }
     };
 
-    // ===== UI HELPERS =====
+    // ===== UI & логика =====
     let currentUser = localStorage.getItem('scan_user') || 'Оператор';
     let allScans = [];
     let filteredScans = [];
@@ -614,7 +684,7 @@
           '<tr><td colspan="4" style="text-align:center; color:#999; padding:16px;">Нет записей</td></tr>';
         return;
       }
-      const rows = scans.slice().reverse().map(s => `
+      tbody.innerHTML = scans.slice().reverse().map(s => `
         <tr>
           <td><strong>${s.sample}</strong></td>
           <td style="font-size:11px;">${s.well_name || ''}</td>
@@ -622,13 +692,14 @@
           <td style="font-size:11px;">${new Date(s.scanned_at).toLocaleString('ru-RU')}</td>
         </tr>
       `).join('');
-      tbody.innerHTML = rows;
     }
 
     function updateStats(scans) {
       const total = scans.length;
       const todayStr = new Date().toISOString().split('T')[0];
-      const today = scans.filter(s => new Date(s.scanned_at).toISOString().split('T')[0] === todayStr).length;
+      const today = scans.filter(s =>
+        new Date(s.scanned_at).toISOString().split('T')[0] === todayStr
+      ).length;
       document.getElementById('scannedTotal').textContent = total;
       document.getElementById('scannedToday').textContent = today;
       document.getElementById('totalScansFooter').textContent = total;
@@ -639,15 +710,14 @@
 
     function filterScans() {
       const q = document.getElementById('searchInput').value.toLowerCase();
-      const scans = allScans.filter(s => {
-        return !q ||
-          (s.sample && s.sample.toLowerCase().includes(q)) ||
-          (s.well_name && s.well_name.toLowerCase().includes(q));
-      });
+      const scans = allScans.filter(s =>
+        !q ||
+        (s.sample && s.sample.toLowerCase().includes(q)) ||
+        (s.well_name && s.well_name.toLowerCase().includes(q))
+      );
       renderScans(scans);
     }
 
-    // ===== MAIN ACTION: запись сканирования =====
     async function processScan() {
       const sample = document.getElementById('sampleInput').value.trim();
       const wellName = document.getElementById('wellNameInput').value.trim();
@@ -667,7 +737,8 @@
           block,
           type,
           scanned_at: Date.now(),
-          scanned_by: currentUser
+          scanned_by: currentUser,
+          sync_status: 'pending'
         };
         await db.addScan(scan);
 
@@ -681,6 +752,7 @@
         lastScannedBarcode = null;
 
         await refreshScans();
+        await syncPendingScans();
         await startCamera();
       } catch (e) {
         console.error(e);
@@ -708,6 +780,7 @@
       }
     }
 
+    // ===== Локальный экспорт CSV (без сервера) =====
     async function exportToCSV() {
       showLoading(true);
       try {
@@ -716,27 +789,51 @@
           showNotification('⚠️ Нет данных для экспорта', 'info');
           return;
         }
-        const headers = ['Sample','Скважина','Тип','Блок','Дата','Сотрудник'];
+        const headers = ['Sample','Скважина','Тип','Блок','Дата','Сотрудник','SyncStatus'];
         const rows = scans.map(s => [
           s.sample,
           s.well_name || '',
           s.type || '',
           s.block || '',
           new Date(s.scanned_at).toLocaleString('ru-RU'),
-          s.scanned_by || ''
+          s.scanned_by || '',
+          s.sync_status || ''
         ]);
         const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
         const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `scans_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `scans_local_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
-        showNotification('✓ CSV выгружен', 'success');
+        showNotification('✓ CSV выгружен (локально)', 'success');
       } catch (e) {
         showNotification(`❌ Ошибка: ${e.message}`, 'error');
       } finally {
         showLoading(false);
+      }
+    }
+
+    // ===== Синхронизация с сайтом (под API) =====
+    async function syncPendingScans() {
+      if (!navigator.onLine) return;
+      try {
+        const pending = await db.getPendingScans();
+        if (!pending.length) return;
+
+        const res = await fetch('/api/scans/bulk', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(pending)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+
+        const syncedIds = pending.map(s => s.id);
+        await db.markSynced(syncedIds);
+        await refreshScans();
+        showNotification(`✓ Синхронизировано: ${pending.length}`, 'success');
+      } catch (e) {
+        console.error('Sync error', e);
       }
     }
 
@@ -769,6 +866,7 @@
         const updateConn = () => {
           document.getElementById('connectionStatus').textContent =
             navigator.onLine ? '✅ Онлайн' : '🔴 Офлайн';
+          if (navigator.onLine) syncPendingScans();
         };
         window.addEventListener('online', updateConn);
         window.addEventListener('offline', updateConn);
@@ -779,7 +877,6 @@
         });
 
         await refreshScans();
-        console.log('App ready');
       } catch (e) {
         console.error(e);
         showNotification('❌ Ошибка инициализации', 'error');
