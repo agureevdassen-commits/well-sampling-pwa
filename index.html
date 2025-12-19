@@ -9,202 +9,1286 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Опробование">
   
-  <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.json">
-  
-  <!-- Icons -->
   <link rel="icon" type="image/png" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
-  
-  <!-- Styles -->
-  <link rel="stylesheet" href="/styles/main.css">
-  <link rel="stylesheet" href="/styles/responsive.css">
   
   <title>Паспорт опробования скважин</title>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #667eea;
+      --success: #28a745;
+      --warning: #ffc107;
+      --danger: #dc3545;
+      --info: #17a2b8;
+      --light: #f8f9fa;
+      --dark: #343a40;
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--dark);
+      line-height: 1.5;
+      height: 100vh;
+      overflow: hidden;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 20px;
+      box-shadow: var(--shadow);
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      margin: 0 0 8px 0;
+    }
+
+    .header-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .header-stat {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 6px 10px;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .header-stat strong {
+      display: block;
+      font-size: 16px;
+      margin-top: 4px;
+    }
+
+    /* ===== MAIN CONTENT ===== */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    /* ===== ЛЕВАЯ ПАНЕЛЬ: СКАНИРОВАНИЕ ===== */
+    .scanner-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .scanner-panel h2 {
+      font-size: 16px;
+      margin: 0 0 12px 0;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 8px;
+    }
+
+    .scanner-input {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .scanner-input input {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .scanner-input input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .scanner-input button {
+      padding: 12px 20px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .scanner-input button:active {
+      transform: scale(0.95);
+      background: #5a67d8;
+    }
+
+    .scanner-result {
+      background: #f0f0f0;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+    }
+
+    .scanner-result.success {
+      background: #d4edda;
+      color: #155724;
+      border-left: 4px solid var(--success);
+    }
+
+    .scanner-result.error {
+      background: #f8d7da;
+      color: #721c24;
+      border-left: 4px solid var(--danger);
+    }
+
+    .scanner-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .scanner-stat {
+      background: var(--light);
+      padding: 8px 12px;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .scanner-stat strong {
+      display: block;
+      font-size: 18px;
+      color: var(--primary);
+      margin-top: 4px;
+    }
+
+    /* ===== ПРАВАЯ ПАНЕЛЬ: КОНТРОЛЬ ===== */
+    .control-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 {
+      font-size: 14px;
+      margin: 0 0 12px 0;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    /* ===== ЗАГРУЗКА ФАЙЛА ===== */
+    .file-upload {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-upload input {
+      padding: 8px;
+      border: 2px dashed #ddd;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .file-upload input:hover {
+      border-color: var(--primary);
+      background: rgba(102, 126, 234, 0.05);
+    }
+
+    /* ===== КНОПКИ ===== */
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .btn {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:active {
+      background: #5a67d8;
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background: var(--light);
+      color: var(--dark);
+      border: 1px solid #ddd;
+    }
+
+    .btn-secondary:active {
+      background: #e9ecef;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-small {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    /* ===== ТАБЛИЦА СКВАЖИН ===== */
+    .wells-table {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+
+    .wells-table table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .wells-table thead {
+      background: var(--light);
+      position: sticky;
+      top: 0;
+    }
+
+    .wells-table th {
+      padding: 6px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .wells-table td {
+      padding: 6px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .wells-table tr:hover {
+      background: rgba(102, 126, 234, 0.05);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .status-badge.sampled {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status-badge.not-sampled {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    /* ===== ПОИСК И ФИЛЬТРЫ ===== */
+    .search-box {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .search-box:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+    }
+
+    .filter-select {
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    /* ===== МОДАЛЬНЫЕ ОКНА ===== */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .modal-content h2 {
+      margin: 0 0 16px 0;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: #f0f0f0;
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ===== ПРОГРЕСС БАР ===== */
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: #e9ecef;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), #764ba2);
+      width: 0%;
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* ===== УВЕДОМЛЕНИЯ ===== */
+    .notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      color: white;
+      font-size: 13px;
+      animation: slideIn 0.3s ease;
+      z-index: 999;
+    }
+
+    .notification.success {
+      background: var(--success);
+    }
+
+    .notification.error {
+      background: var(--danger);
+    }
+
+    .notification.info {
+      background: var(--info);
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* ===== РЕСПОНСИВ ===== */
+    @media (max-width: 1024px) {
+      .main {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+
+      .header-stats {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 16px;
+      }
+
+      .header-stats {
+        grid-template-columns: repeat(2, 1fr);
+        font-size: 11px;
+      }
+
+      .card {
+        padding: 12px;
+      }
+
+      .card h3 {
+        font-size: 13px;
+      }
+
+      .scanner-result {
+        min-height: 60px;
+        font-size: 12px;
+      }
+    }
+
+    /* ===== LOADING ===== */
+    .loading {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .loading.active {
+      display: flex;
+    }
+
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ===== СКРЫТИЕ ЛИШНИХ ЭЛЕМЕНТОВ ===== */
+    .hidden {
+      display: none !important;
+    }
+  </style>
 </head>
 <body>
-  <!-- App Container -->
-  <div id="app" class="app-container">
-    <!-- Navigation -->
-    <nav class="bottom-nav">
-      <a href="/pages/home.html" class="nav-item active" data-page="home">
-        <span class="nav-icon">🏠</span>
-        <span class="nav-label">Главная</span>
-      </a>
-      <a href="/pages/scanner.html" class="nav-item" data-page="scanner">
-        <span class="nav-icon">📷</span>
-        <span class="nav-label">Сканер</span>
-      </a>
-      <a href="/pages/samples.html" class="nav-item" data-page="samples">
-        <span class="nav-icon">📊</span>
-        <span class="nav-label">Пробы</span>
-      </a>
-      <a href="/pages/duplicates.html" class="nav-item" data-page="duplicates">
-        <span class="nav-icon">🔄</span>
-        <span class="nav-label">Дубликаты</span>
-      </a>
-      <a href="/pages/export.html" class="nav-item" data-page="export">
-        <span class="nav-icon">📥</span>
-        <span class="nav-label">Экспорт</span>
-      </a>
-    </nav>
-
-    <!-- Main Content Area -->
-    <main id="main-content" class="main-content">
-      <!-- Будет заполнено JavaScript -->
-    </main>
-  </div>
-
-  <!-- Install Prompt -->
-  <div id="install-prompt" class="install-prompt">
-    <div class="install-content">
-      <div class="install-icon">📱</div>
-      <div class="install-text">
-        <h3>Установить приложение</h3>
-        <p>Быстрый доступ со значком на рабочем столе</p>
+  <div class="container">
+    <!-- HEADER -->
+    <div class="header">
+      <h1>📊 Паспорт опробования скважин</h1>
+      <div class="header-stats">
+        <div class="header-stat">
+          <span>Всего</span>
+          <strong id="totalWellsHeader">0</strong>
+        </div>
+        <div class="header-stat">
+          <span>Опробовано</span>
+          <strong id="sampledWellsHeader">0</strong>
+        </div>
+        <div class="header-stat">
+          <span>Прогресс</span>
+          <strong id="progressHeader">0%</strong>
+        </div>
       </div>
-      <button id="install-btn" class="install-btn">Установить</button>
-      <button class="install-close" onclick="closeInstallPrompt()">✕</button>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main">
+      <!-- ЛЕВАЯ ПАНЕЛЬ: СКАНИРОВАНИЕ -->
+      <div class="scanner-panel">
+        <h2>🔍 Сканирование штрихкодов</h2>
+
+        <!-- Ввод штрихкода -->
+        <div class="scanner-input">
+          <input 
+            type="text" 
+            id="barcodeInput" 
+            placeholder="Сканируйте или введите ID скважины"
+            autocomplete="off"
+          >
+          <button onclick="processScan()">✓ Сканировать</button>
+        </div>
+
+        <!-- Результат сканирования -->
+        <div class="scanner-result" id="scanResult">
+          Результат сканирования
+        </div>
+
+        <!-- Прогресс -->
+        <div style="margin-top: 12px;">
+          <small style="color: #666;">Статус опробования</small>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+          </div>
+          <small style="color: #666;" id="progressText">0 из 0 скважин</small>
+        </div>
+
+        <!-- Статистика -->
+        <div class="scanner-stats">
+          <div class="scanner-stat">
+            <span>Сегодня</span>
+            <strong id="scannedToday">0</strong>
+          </div>
+          <div class="scanner-stat">
+            <span>Всего</span>
+            <strong id="scannedTotal">0</strong>
+          </div>
+        </div>
+
+        <!-- Действия -->
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="showUploadModal()">📁 Загрузить DVG файл</button>
+          <button class="btn btn-secondary" onclick="showDuplicatesModal()">🔄 Генерировать дубликаты</button>
+          <button class="btn btn-secondary" onclick="exportToExcel()">📥 Экспорт в Excel</button>
+        </div>
+      </div>
+
+      <!-- ПРАВАЯ ПАНЕЛЬ: СПИСОК ПРОБ -->
+      <div class="control-panel">
+        <!-- Поиск и фильтры -->
+        <div class="card">
+          <h3>🔎 Поиск и фильтры</h3>
+          <input 
+            type="text" 
+            class="search-box" 
+            id="searchInput" 
+            placeholder="Поиск по ID или названию..."
+            onkeyup="filterWells()"
+          >
+          <select class="filter-select" id="filterStatus" onchange="filterWells()">
+            <option value="all">📌 Все скважины</option>
+            <option value="sampled">✓ Опробованы</option>
+            <option value="not_sampled">○ Не опробованы</option>
+          </select>
+          <small style="color: #666;" id="wellsCount">Найдено: 0</small>
+        </div>
+
+        <!-- Список скважин -->
+        <div class="card">
+          <h3>📋 Список проб</h3>
+          <div class="wells-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Название</th>
+                  <th>Координаты</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody id="wellsTableBody">
+                <tr>
+                  <td colspan="4" style="text-align: center; color: #999; padding: 20px;">
+                    Нет данных. Загрузите DVG файл
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Информация -->
+        <div class="card">
+          <h3>ℹ️ Система</h3>
+          <div style="font-size: 12px; display: grid; gap: 8px;">
+            <div>
+              <strong>Статус:</strong>
+              <span id="connectionStatus" style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">🔴 Проверка...</span>
+            </div>
+            <div>
+              <strong>Версия:</strong> 1.0 PWA
+            </div>
+            <div>
+              <strong>Пользователь:</strong>
+              <input 
+                type="text" 
+                id="userNameInput" 
+                style="width: 100%; padding: 4px; margin-top: 4px; border: 1px solid #ddd; border-radius: 3px;"
+                placeholder="Введите имя"
+              >
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Update Notification -->
-  <div id="update-notification" class="update-notification">
-    <div class="update-content">
-      <span>Доступно обновление приложения</span>
-      <button onclick="updateServiceWorker()" class="btn-update">Обновить</button>
+  <!-- MODAL: Загрузка файла -->
+  <div class="modal" id="uploadModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('uploadModal')">✕</button>
+      <h2>📁 Загрузить реестр скважин (DVG)</h2>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">
+        Выберите Excel файл с колонками: ID, X, Y, Z, Наименование
+      </p>
+      <input type="file" id="dvgFile" accept=".xlsx,.xls,.csv" style="width: 100%; margin-bottom: 12px;">
+      <button class="btn btn-primary" onclick="uploadDVGFile()" style="width: 100%;">📤 Загрузить</button>
     </div>
   </div>
 
-  <!-- Sync Status Indicator -->
-  <div id="sync-indicator" class="sync-indicator">
-    <span id="sync-status" class="sync-status"></span>
+  <!-- MODAL: Дубликаты -->
+  <div class="modal" id="duplicatesModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('duplicatesModal')">✕</button>
+      <h2>🔄 Генерирование контрольных проб</h2>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px;">
+        Выберите кратность дубликатов
+      </p>
+      <select style="width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 4px;">
+        <option value="1:10">Каждая 10-я проба (1:10)</option>
+        <option value="1:20">Каждая 20-я проба (1:20)</option>
+        <option value="1:5">Каждая 5-я проба (1:5)</option>
+      </select>
+      <button class="btn btn-primary" onclick="generateDuplicatesFromModal()" style="width: 100%;">✓ Создать дубликаты</button>
+      <button class="btn btn-secondary" onclick="exportDuplicates()" style="width: 100%; margin-top: 8px;">📥 Экспорт дубликатов</button>
+    </div>
   </div>
 
-  <!-- Loading Spinner -->
-  <div id="loading-spinner" class="loading-spinner hidden">
+  <!-- LOADING -->
+  <div class="loading" id="loading">
     <div class="spinner"></div>
   </div>
 
-  <!-- Scripts -->
-  <script src="js/utils.js"></script>
-  <script src="js/database.js"></script>
-  <script src="js/app.js"></script>
-
+  <!-- Service Worker Registration & Scripts -->
   <script>
-    // ========== PWA INSTALLATION ==========
-    let deferredPrompt;
-    const installBtn = document.getElementById('install-btn');
-    const installPrompt = document.getElementById('install-prompt');
-
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installPrompt.style.display = 'flex';
-      console.log('Install prompt available');
-    });
-
-    installBtn.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response: ${outcome}`);
-        deferredPrompt = null;
-        closeInstallPrompt();
-      }
-    });
-
-    window.addEventListener('appinstalled', () => {
-      console.log('App installed');
-      deferredPrompt = null;
-      closeInstallPrompt();
-      showNotification('✓ Приложение успешно установлено!', 'success');
-    });
-
-    function closeInstallPrompt() {
-      installPrompt.style.display = 'none';
-    }
-
-    // ========== SERVICE WORKER REGISTRATION ==========
+    // ========== PWA SETUP ==========
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js')
-        .then(registration => {
-          console.log('Service Worker registered:', registration);
+        .then(reg => console.log('✓ Service Worker registered'))
+        .catch(err => console.error('✗ Service Worker error:', err));
+    }
 
-          // Проверка обновлений каждые 30 секунд
-          setInterval(() => {
-            registration.update();
-          }, 30000);
+    // ========== DATABASE INITIALIZATION ==========
+    const db = {
+      name: 'well_sampling_db',
+      instance: null,
 
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                document.getElementById('update-notification').style.display = 'block';
-                console.log('Update available');
-              }
+      async init() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(this.name, 1);
+          
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            this.instance = request.result;
+            console.log('✓ Database initialized');
+            resolve(this.instance);
+          };
+          
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            
+            if (!db.objectStoreNames.contains('wells')) {
+              const wellStore = db.createObjectStore('wells', { keyPath: 'well_id' });
+              wellStore.createIndex('status', 'sampling_status', { unique: false });
+            }
+            
+            if (!db.objectStoreNames.contains('duplicates')) {
+              db.createObjectStore('duplicates', { keyPath: 'duplicate_id' });
+            }
+            
+            if (!db.objectStoreNames.contains('logs')) {
+              db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
+            }
+          };
+        });
+      },
+
+      async addWells(wellsData) {
+        const tx = this.instance.transaction('wells', 'readwrite');
+        const store = tx.objectStore('wells');
+        
+        return new Promise((resolve) => {
+          wellsData.forEach(well => {
+            store.add({
+              ...well,
+              sampling_status: 'not_sampled',
+              created_at: Date.now(),
+              sampled_at: null,
+              sampled_by: null
             });
           });
-        })
-        .catch(error => {
-          console.error('Service Worker registration failed:', error);
+          
+          tx.oncomplete = () => resolve(wellsData.length);
         });
+      },
 
-      // Получение сообщений от Service Worker
-      navigator.serviceWorker.addEventListener('message', event => {
-        if (event.data.type === 'sync-complete') {
-          showNotification(
-            `✓ Синхронизировано ${event.data.count} проб`,
-            'success'
-          );
-          location.reload();
-        }
-      });
+      async getAllWells() {
+        const tx = this.instance.transaction('wells', 'readonly');
+        const store = tx.objectStore('wells');
+        
+        return new Promise((resolve) => {
+          const request = store.getAll();
+          request.onsuccess = () => resolve(request.result);
+        });
+      },
+
+      async updateWellStatus(wellId, userName) {
+        const tx = this.instance.transaction('wells', 'readwrite');
+        const store = tx.objectStore('wells');
+        
+        return new Promise((resolve, reject) => {
+          const request = store.get(wellId);
+          request.onsuccess = () => {
+            const well = request.result;
+            if (!well) {
+              reject(new Error('Well not found'));
+              return;
+            }
+            
+            well.sampling_status = 'sampled';
+            well.sampled_at = Date.now();
+            well.sampled_by = userName;
+            store.put(well);
+            resolve(well);
+          };
+        });
+      },
+
+      async addLog(wellId, wellName, userName) {
+        const tx = this.instance.transaction('logs', 'readwrite');
+        const store = tx.objectStore('logs');
+        
+        store.add({
+          wellId,
+          wellName,
+          userName,
+          timestamp: Date.now()
+        });
+      },
+
+      async addDuplicate(duplicate) {
+        const tx = this.instance.transaction('duplicates', 'readwrite');
+        const store = tx.objectStore('duplicates');
+        
+        return new Promise((resolve) => {
+          store.add(duplicate);
+          tx.oncomplete = () => resolve();
+        });
+      },
+
+      async getAllDuplicates() {
+        const tx = this.instance.transaction('duplicates', 'readonly');
+        const store = tx.objectStore('duplicates');
+        
+        return new Promise((resolve) => {
+          const request = store.getAll();
+          request.onsuccess = () => resolve(request.result);
+        });
+      },
+
+      async getLogs(limit = 100) {
+        const tx = this.instance.transaction('logs', 'readonly');
+        const store = tx.objectStore('logs');
+        
+        return new Promise((resolve) => {
+          const request = store.getAll();
+          request.onsuccess = () => {
+            const logs = request.result.reverse().slice(0, limit);
+            resolve(logs);
+          };
+        });
+      },
+
+      async getStatistics() {
+        const wells = await this.getAllWells();
+        const sampled = wells.filter(w => w.sampling_status === 'sampled').length;
+        const completion = wells.length > 0 ? (sampled / wells.length) * 100 : 0;
+        
+        return {
+          totalWells: wells.length,
+          sampledWells: sampled,
+          completionPercentage: completion.toFixed(1)
+        };
+      },
+
+      async clearAllData() {
+        const tx = this.instance.transaction(['wells', 'duplicates', 'logs'], 'readwrite');
+        tx.objectStore('wells').clear();
+        tx.objectStore('duplicates').clear();
+        tx.objectStore('logs').clear();
+      }
+    };
+
+    // ========== UI HELPERS ==========
+    let currentUser = localStorage.getItem('userName') || 'Сотрудник';
+    let filteredWells = [];
+    let allWells = [];
+
+    function showNotification(message, type = 'info') {
+      const notif = document.createElement('div');
+      notif.className = `notification ${type}`;
+      notif.textContent = message;
+      document.body.appendChild(notif);
+      
+      setTimeout(() => {
+        notif.style.animation = 'slideIn 0.3s ease reverse';
+        setTimeout(() => notif.remove(), 300);
+      }, 2500);
     }
 
-    // ========== UPDATE SERVICE WORKER ==========
-    function updateServiceWorker() {
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
-        window.location.reload();
-      }
+    function showLoading(show = true) {
+      document.getElementById('loading').classList.toggle('active', show);
     }
 
-    // ========== OFFLINE/ONLINE DETECTION ==========
-    window.addEventListener('online', () => {
-      console.log('Back online');
-      showNotification('✓ Соединение восстановлено', 'success');
-      if ('serviceWorker' in navigator && 'SyncManager' in window) {
-        navigator.serviceWorker.ready.then(registration => {
-          registration.sync.register('sync-samples');
-          registration.sync.register('sync-duplicates');
-        });
-      }
-    });
+    function showModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
 
-    window.addEventListener('offline', () => {
-      console.log('Offline');
-      showNotification('📡 Режим офлайн', 'warning');
-    });
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
 
-    // ========== INITIALIZATION ==========
-    document.addEventListener('DOMContentLoaded', async () => {
+    function showUploadModal() {
+      showModal('uploadModal');
+    }
+
+    function showDuplicatesModal() {
+      showModal('duplicatesModal');
+    }
+
+    // ========== СТАТИСТИКА ==========
+    async function updateStatistics() {
       try {
-        // Инициализируем БД
-        await db.init();
-        console.log('App initialized');
+        allWells = await db.getAllWells();
+        const stats = await db.getStatistics();
+        
+        document.getElementById('totalWellsHeader').textContent = stats.totalWells;
+        document.getElementById('sampledWellsHeader').textContent = stats.sampledWells;
+        document.getElementById('progressHeader').textContent = stats.completionPercentage + '%';
+        
+        document.getElementById('progressBar').style.width = stats.completionPercentage + '%';
+        document.getElementById('progressText').textContent = `${stats.sampledWells} из ${stats.totalWells} скважин`;
+        
+        // Сегодняшние сканирования
+        const today = new Date().toISOString().split('T');
+        const logs = await db.getLogs();
+        const todayLogs = logs.filter(l => 
+          new Date(l.timestamp).toISOString().split('T') === today
+        );
+        
+        document.getElementById('scannedToday').textContent = todayLogs.length;
+        document.getElementById('scannedTotal').textContent = stats.sampledWells;
+        
+        renderWells(allWells);
+      } catch (error) {
+        console.error('Error updating statistics:', error);
+      }
+    }
 
-        // Загружаем главную страницу
-        await loadPage('home');
+    // ========== ОТОБРАЖЕНИЕ СКВАЖИН ==========
+    function renderWells(wells) {
+      const tbody = document.getElementById('wellsTableBody');
+      document.getElementById('wellsCount').textContent = `Найдено: ${wells.length}`;
+      
+      if (wells.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999; padding: 20px;">Нет данных</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = wells.map(well => `
+        <tr>
+          <td><strong>${well.well_id}</strong></td>
+          <td style="font-size: 10px;">${well.well_name}</td>
+          <td style="font-size: 9px;">X: ${well.x_coord.toFixed(1)}</td>
+          <td>
+            <span class="status-badge ${well.sampling_status}">
+              ${well.sampling_status === 'sampled' ? '✓' : '○'}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
 
-        // Обновляем статистику
+    function filterWells() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const status = document.getElementById('filterStatus').value;
+      
+      filteredWells = allWells.filter(well => {
+        const matchesSearch = !search || 
+          well.well_id.toLowerCase().includes(search) ||
+          well.well_name.toLowerCase().includes(search);
+        
+        const matchesStatus = status === 'all' || well.sampling_status === status;
+        
+        return matchesSearch && matchesStatus;
+      });
+      
+      renderWells(filteredWells);
+    }
+
+    // ========== СКАНИРОВАНИЕ ==========
+    async function processScan() {
+      const barcode = document.getElementById('barcodeInput').value.trim();
+      
+      if (!barcode) {
+        showNotification('⚠️ Введите штрихкод', 'info');
+        return;
+      }
+
+      showLoading(true);
+      
+      try {
+        const well = allWells.find(w => w.well_id === barcode);
+        
+        if (!well) {
+          document.getElementById('scanResult').innerHTML = '❌ Скважина не найдена';
+          document.getElementById('scanResult').className = 'scanner-result error';
+          showNotification('❌ Скважина не найдена', 'error');
+          document.getElementById('barcodeInput').value = '';
+          return;
+        }
+
+        await db.updateWellStatus(well.well_id, currentUser);
+        await db.addLog(well.well_id, well.well_name, currentUser);
+        
+        document.getElementById('scanResult').innerHTML = `
+          <div>
+            <strong>✓ Успешно!</strong><br>
+            ${well.well_name}<br>
+            ID: ${well.well_id}
+          </div>
+        `;
+        document.getElementById('scanResult').className = 'scanner-result success';
+        
+        playBeep();
+        if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+        
+        showNotification(`✓ ${well.well_name} опробована`, 'success');
+        
+        document.getElementById('barcodeInput').value = '';
+        document.getElementById('barcodeInput').focus();
+        
         await updateStatistics();
       } catch (error) {
-        console.error('Initialization error:', error);
+        console.error('Scan error:', error);
+        showNotification(`❌ Ошибка: ${error.message}`, 'error');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    function playBeep() {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.frequency.value = 800;
+      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+      
+      osc.start(audioContext.currentTime);
+      osc.stop(audioContext.currentTime + 0.1);
+    }
+
+    // ========== ЗАГРУЗКА DVG ==========
+    async function uploadDVGFile() {
+      const file = document.getElementById('dvgFile').files;
+      if (!file) {
+        showNotification('⚠️ Выберите файл', 'info');
+        return;
+      }
+
+      showLoading(true);
+      
+      try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            // Используем встроенный парсер CSV или простую обработку
+            const text = e.target.result;
+            const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+            
+            const wells = [];
+            for (let i = 1; i < lines.length; i++) {
+              const parts = lines[i].split('\t').map(p => p.trim());
+              if (parts.length >= 5) {
+                wells.push({
+                  well_id: parts,
+                  x_coord: parseFloat(parts),
+                  y_coord: parseFloat(parts),
+                  z_coord: parseFloat(parts),
+                  well_name: parts || `Скважина ${parts}`,
+                  total_depth: parseFloat(parts) || 0
+                });
+              }
+            }
+            
+            if (wells.length === 0) {
+              throw new Error('Нет валидных данных в файле');
+            }
+            
+            const added = await db.addWells(wells);
+            showNotification(`✓ Импортировано ${added} скважин`, 'success');
+            closeModal('uploadModal');
+            await updateStatistics();
+          } catch (error) {
+            showNotification(`❌ Ошибка: ${error.message}`, 'error');
+          } finally {
+            showLoading(false);
+          }
+        };
+        
+        reader.readAsText(file);
+      } catch (error) {
+        console.error('Upload error:', error);
+        showNotification(`❌ Ошибка: ${error.message}`, 'error');
+        showLoading(false);
+      }
+    }
+
+    // ========== ДУБЛИКАТЫ ==========
+    async function generateDuplicatesFromModal() {
+      const ratio = document.querySelector('#duplicatesModal select').value;
+      await generateDuplicates(ratio);
+      closeModal('duplicatesModal');
+    }
+
+    async function generateDuplicates(ratio = '1:10') {
+      showLoading(true);
+      
+      try {
+        const wells = await db.getAllWells();
+        const sampledWells = wells.filter(w => w.sampling_status === 'sampled');
+        
+        if (sampledWells.length === 0) {
+          showNotification('⚠️ Нет опробованных скважин', 'info');
+          return;
+        }
+
+        const [num, denom] = ratio.split(':').map(Number);
+        let count = 0;
+        
+        for (let i = 0; i < sampledWells.length; i++) {
+          if ((i + 1) % denom === 0) {
+            await db.addDuplicate({
+              duplicate_id: `${sampledWells[i].well_id}_DUP_${Math.floor(i / denom) + 1}`,
+              original_sample_id: sampledWells[i].well_id,
+              duplicate_ratio: ratio,
+              created_at: Date.now(),
+              analysis_status: 'not_analyzed'
+            });
+            count++;
+          }
+        }
+        
+        showNotification(`✓ Создано ${count} дубликатов`, 'success');
+      } catch (error) {
+        showNotification(`❌ Ошибка: ${error.message}`, 'error');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // ========== ЭКСПОРТ ==========
+    async function exportToExcel() {
+      showLoading(true);
+      
+      try {
+        const wells = await db.getAllWells();
+        
+        if (wells.length === 0) {
+          showNotification('⚠️ Нет данных для экспорта', 'info');
+          return;
+        }
+        
+        // Создаем CSV
+        const headers = ['ID', 'Название', 'X', 'Y', 'Z', 'Глубина', 'Статус', 'Дата', 'Сотрудник'];
+        const rows = wells.map(w => [
+          w.well_id,
+          w.well_name,
+          w.x_coord.toFixed(2),
+          w.y_coord.toFixed(2),
+          w.z_coord.toFixed(2),
+          w.total_depth,
+          w.sampling_status === 'sampled' ? 'Опробована' : 'Не опробована',
+          w.sampled_at ? new Date(w.sampled_at).toLocaleString('ru-RU') : '',
+          w.sampled_by || ''
+        ]);
+        
+        const csv = [headers, ...rows]
+          .map(row => row.map(cell => `"${cell}"`).join(','))
+          .join('\n');
+        
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Паспорт_опробования_${new Date().toISOString().split('T')}.csv`);
+        link.click();
+        
+        showNotification('✓ Файл экспортирован', 'success');
+      } catch (error) {
+        showNotification(`❌ Ошибка: ${error.message}`, 'error');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    async function exportDuplicates() {
+      showLoading(true);
+      
+      try {
+        const duplicates = await db.getAllDuplicates();
+        
+        if (duplicates.length === 0) {
+          showNotification('⚠️ Нет дубликатов для экспорта', 'info');
+          return;
+        }
+        
+        const headers = ['ID дубликата', 'Оригинальная проба', 'Кратность', 'Дата', 'Статус анализа'];
+        const rows = duplicates.map(d => [
+          d.duplicate_id,
+          d.original_sample_id,
+          d.duplicate_ratio,
+          new Date(d.created_at).toLocaleString('ru-RU'),
+          d.analysis_status === 'analyzed' ? 'Проанализирован' : 'Не проанализирован'
+        ]);
+        
+        const csv = [headers, ...rows]
+          .map(row => row.map(cell => `"${cell}"`).join(','))
+          .join('\n');
+        
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Дубликаты_${new Date().toISOString().split('T')}.csv`);
+        link.click();
+        
+        showNotification('✓ Дубликаты экспортированы', 'success');
+      } catch (error) {
+        showNotification(`❌ Ошибка: ${error.message}`, 'error');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // ========== ИНИЦИАЛИЗАЦИЯ ==========
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        await db.init();
+        
+        // Восстановление имени пользователя
+        const saved = localStorage.getItem('userName');
+        if (saved) {
+          currentUser = saved;
+          document.getElementById('userNameInput').value = saved;
+        }
+        
+        document.getElementById('userNameInput').addEventListener('change', () => {
+          currentUser = document.getElementById('userNameInput').value || 'Сотрудник';
+          localStorage.setItem('userName', currentUser);
+        });
+        
+        // Статус соединения
+        const updateStatus = () => {
+          const status = navigator.onLine ? '✅ Онлайн' : '🔴 Офлайн';
+          document.getElementById('connectionStatus').textContent = status;
+        };
+        
+        window.addEventListener('online', updateStatus);
+        window.addEventListener('offline', updateStatus);
+        updateStatus();
+        
+        // Обновление статистики
+        await updateStatistics();
+        
+        // Фокус на сканирование
+        document.getElementById('barcodeInput').focus();
+        
+        // Enter для сканирования
+        document.getElementById('barcodeInput').addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') processScan();
+        });
+        
+        console.log('✓ App initialized');
+      } catch (error) {
+        console.error('Init error:', error);
         showNotification('❌ Ошибка инициализации', 'error');
       }
     });
+
+    // Обновление каждые 30 сек
+    setInterval(updateStatistics, 30000);
   </script>
 </body>
 </html>
