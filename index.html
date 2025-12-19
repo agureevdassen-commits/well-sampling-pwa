@@ -4,791 +4,458 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#667eea">
-  <meta name="description" content="Система управления паспортом опробования скважин">
+  <meta name="description" content="Сканирование проб (Sample / Скважина / Тип / Блок)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Опробование">
+  <meta name="apple-mobile-web-app-title" content="Sampling">
 
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-  <title>Паспорт опробования скважин</title>
+  <title>Сканирование проб</title>
 
-  <!-- ZXing Barcode Scanner Library -->
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
 
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin:0; padding:0; box-sizing:border-box; }
 
     :root {
-      --primary: #667eea;
-      --success: #28a745;
-      --warning: #ffc107;
-      --danger: #dc3545;
-      --info: #17a2b8;
-      --light: #f8f9fa;
-      --dark: #343a40;
-      --bg: #f5f7fa;
-      --surface: #ffffff;
-      --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+      --primary:#667eea;
+      --success:#28a745;
+      --danger:#dc3545;
+      --info:#17a2b8;
+      --light:#f8f9fa;
+      --dark:#343a40;
+      --bg:#f5f7fa;
+      --surface:#ffffff;
+      --shadow:0 2px 8px rgba(0,0,0,0.1);
+      --shadow-lg:0 8px 24px rgba(0,0,0,0.15);
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: var(--bg);
-      color: var(--dark);
-      line-height: 1.5;
-      height: 100vh;
-      overflow: hidden;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+      background:var(--bg);
+      color:var(--dark);
+      height:100vh;
+      overflow:hidden;
     }
 
-    .container {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
+    .container { display:flex; flex-direction:column; height:100vh; }
 
-    /* HEADER */
     .header {
-      background: linear-gradient(135deg, var(--primary) 0%, #764ba2 100%);
-      color: white;
-      padding: 16px 20px;
-      box-shadow: var(--shadow);
-      z-index: 100;
+      background:linear-gradient(135deg,var(--primary) 0%,#764ba2 100%);
+      color:#fff;
+      padding:12px 16px;
+      box-shadow:var(--shadow);
     }
+    .header h1 { font-size:18px; }
 
-    .header h1 {
-      font-size: 20px;
-      margin: 0;
-    }
-
-    /* MAIN LAYOUT */
     .main {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      padding: 16px;
-      overflow-y: auto;
-    }
-
-    .scanner-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background: var(--surface);
-      border-radius: 8px;
-      padding: 16px;
-      box-shadow: var(--shadow);
-    }
-
-    .scanner-panel h2 {
-      font-size: 16px;
-      margin: 0 0 12px 0;
-      border-bottom: 2px solid var(--primary);
-      padding-bottom: 8px;
-    }
-
-    .control-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      overflow-y: auto;
+      flex:1;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      padding:12px;
+      overflow-y:auto;
     }
 
     .card {
-      background: var(--surface);
-      border-radius: 8px;
-      padding: 16px;
-      box-shadow: var(--shadow);
+      background:var(--surface);
+      border-radius:8px;
+      padding:12px;
+      box-shadow:var(--shadow);
+    }
+    .card h2, .card h3 {
+      font-size:14px;
+      margin-bottom:8px;
+      border-bottom:2px solid var(--primary);
+      padding-bottom:4px;
     }
 
-    .card h3 {
-      font-size: 14px;
-      margin: 0 0 12px 0;
-      padding-bottom: 8px;
-      border-bottom: 2px solid var(--primary);
-    }
+    .scanner-panel { display:flex; flex-direction:column; gap:8px; }
 
-    /* CAMERA */
     .camera-container {
-      width: 100%;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #000;
-      margin-bottom: 12px;
-      position: relative;
+      width:100%;
+      border:2px solid #ddd;
+      border-radius:8px;
+      overflow:hidden;
+      background:#000;
+      position:relative;
+      margin-bottom:8px;
     }
-
     #video {
-      width: 100%;
-      height: 200px;
-      object-fit: cover;
-      display: block;
+      width:100%;
+      height:200px;
+      object-fit:cover;
+      display:block;
     }
-
     .camera-status {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 6px 10px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
+      position:absolute;
+      top:6px;
+      right:6px;
+      background:rgba(0,0,0,0.7);
+      color:#fff;
+      padding:4px 8px;
+      font-size:11px;
+      border-radius:4px;
+      font-weight:600;
     }
-
     .camera-status.scanning {
-      background: rgba(40, 167, 69, 0.95);
-      animation: pulse 1.5s infinite;
+      background:rgba(40,167,69,0.95);
+      animation:pulse 1.5s infinite;
     }
-
-    .camera-status.inactive {
-      background: rgba(100, 100, 100, 0.8);
-    }
-
-    .camera-status.error {
-      background: rgba(220, 53, 69, 0.95);
-    }
+    .camera-status.inactive { background:rgba(120,120,120,0.9); }
+    .camera-status.error { background:rgba(220,53,69,0.95); }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
+      0%,100% { opacity:1; }
+      50% { opacity:0.7; }
     }
 
-    /* INPUTS */
-    .scanner-input {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 8px;
+    .input-row {
+      display:flex;
+      gap:8px;
+      margin-bottom:6px;
+    }
+    .input-row input,
+    .input-row select {
+      flex:1;
+      padding:8px;
+      border:1px solid #ddd;
+      border-radius:6px;
+      font-size:13px;
+    }
+    #sampleInput {
+      border-width:2px;
+      font-weight:600;
+      text-align:center;
+    }
+    #sampleInput:focus {
+      outline:none;
+      border-color:var(--primary);
+      box-shadow:0 0 0 2px rgba(102,126,234,0.15);
+      background:#f0f7ff;
+    }
+    #sampleInput.filled {
+      border-color:var(--primary);
+      background:#f0f7ff;
     }
 
-    .scanner-input input,
-    .scanner-input select {
-      flex: 1;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 14px;
+    .input-row button {
+      padding:8px 12px;
+      border:none;
+      border-radius:6px;
+      background:var(--primary);
+      color:#fff;
+      font-size:13px;
+      font-weight:600;
+      cursor:pointer;
+      flex:0 0 auto;
+    }
+    .input-row button:active {
+      transform:scale(0.96);
+      background:#5a67d8;
     }
 
-    #barcodeInput {
-      border: 2px solid #ddd;
-      font-weight: 600;
-      text-align: center;
-    }
-
-    #barcodeInput:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-      background: #f0f7ff;
-    }
-
-    #barcodeInput.filled {
-      border-color: var(--primary);
-      background: #f0f7ff;
-    }
-
-    .scanner-input button {
-      padding: 10px 16px;
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.2s;
-      flex: 0 0 auto;
-    }
-
-    .scanner-input button:active {
-      transform: scale(0.95);
-      background: #5a67d8;
-    }
-
-    .scanner-input button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    /* RESULT */
     .scanner-result {
-      background: #f0f0f0;
-      padding: 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      min-height: 70px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #999;
-      white-space: pre-line;
+      background:#f0f0f0;
+      border-radius:6px;
+      padding:8px;
+      min-height:60px;
+      font-size:12px;
+      color:#666;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      white-space:pre-line;
     }
-
     .scanner-result.success {
-      background: #d4edda;
-      color: #155724;
-      border-left: 4px solid var(--success);
+      background:#d4edda;
+      color:#155724;
+      border-left:4px solid var(--success);
     }
-
     .scanner-result.error {
-      background: #f8d7da;
-      color: #721c24;
-      border-left: 4px solid var(--danger);
+      background:#f8d7da;
+      color:#721c24;
+      border-left:4px solid var(--danger);
     }
 
-    .scanner-result.info {
-      background: #d1ecf1;
-      color: #0c5460;
-      border-left: 4px solid var(--info);
+    .small-stats {
+      display:flex;
+      gap:8px;
+      margin-top:4px;
+    }
+    .small-stat {
+      flex:1;
+      background:var(--light);
+      border-radius:4px;
+      padding:6px 8px;
+      font-size:11px;
+      text-align:center;
+    }
+    .small-stat strong {
+      display:block;
+      font-size:16px;
+      color:var(--primary);
     }
 
-    /* STATS SMALL */
-    .scanner-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .scanner-stat {
-      background: var(--light);
-      padding: 8px 12px;
-      border-radius: 4px;
-      text-align: center;
-      font-size: 12px;
-    }
-
-    .scanner-stat strong {
-      display: block;
-      font-size: 18px;
-      color: var(--primary);
-      margin-top: 4px;
-    }
-
-    /* BUTTONS */
     .btn-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-top: 8px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      margin-top:6px;
     }
-
     .btn {
-      padding: 10px 14px;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
+      padding:8px 12px;
+      border:none;
+      border-radius:6px;
+      font-size:13px;
+      font-weight:600;
+      cursor:pointer;
     }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-primary:active { background:#5a67d8; }
+    .btn-secondary { background:var(--light); color:var(--dark); border:1px solid #ddd; }
+    .btn-secondary:active { background:#e9ecef; }
 
-    .btn-primary {
-      background: var(--primary);
-      color: white;
-    }
-
-    .btn-primary:active {
-      background: #5a67d8;
-      transform: scale(0.98);
-    }
-
-    .btn-secondary {
-      background: var(--light);
-      color: var(--dark);
-      border: 1px solid #ddd;
-    }
-
-    .btn-secondary:active {
-      background: #e9ecef;
-    }
-
-    /* TABLE */
     .wells-table {
-      max-height: 300px;
-      overflow-y: auto;
-      border: 1px solid #ddd;
-      border-radius: 6px;
+      max-height:320px;
+      overflow-y:auto;
+      border:1px solid #ddd;
+      border-radius:6px;
     }
-
     .wells-table table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
+      width:100%;
+      border-collapse:collapse;
+      font-size:11px;
     }
-
     .wells-table thead {
-      background: var(--light);
-      position: sticky;
-      top: 0;
+      background:var(--light);
+      position:sticky;
+      top:0;
     }
-
-    .wells-table th {
-      padding: 6px;
-      text-align: left;
-      font-weight: 600;
-      border-bottom: 1px solid #ddd;
-    }
-
+    .wells-table th,
     .wells-table td {
-      padding: 6px;
-      border-bottom: 1px solid #ddd;
+      padding:6px;
+      border-bottom:1px solid #eee;
+      text-align:left;
     }
+    .wells-table tr:hover { background:#f8f9fa; }
 
-    .wells-table tr:hover {
-      background: rgba(102, 126, 234, 0.05);
+    .footer-stats {
+      margin:8px 12px 12px;
+      background:var(--surface);
+      border-radius:8px;
+      padding:8px 12px;
+      box-shadow:var(--shadow);
     }
-
-    .status-badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-size: 10px;
-      font-weight: 600;
+    .footer-grid {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:8px;
+      font-size:11px;
     }
-
-    .status-badge.sampled {
-      background: #d4edda;
-      color: #155724;
+    .footer-item {
+      background:#f8f9ff;
+      border-radius:4px;
+      padding:4px 6px;
+      text-align:center;
     }
+    .footer-item span { color:#666; }
+    .footer-item strong { display:block; font-size:15px; }
 
-    .status-badge.not_sampled {
-      background: #fff3cd;
-      color: #856404;
+    .loading {
+      display:none;
+      position:fixed;
+      top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.4);
+      z-index:2000;
+      align-items:center;
+      justify-content:center;
     }
-
-    /* SEARCH */
-    .search-box {
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 12px;
-      width: 100%;
-      margin-bottom: 8px;
+    .loading.active { display:flex; }
+    .spinner {
+      width:40px; height:40px;
+      border-radius:50%;
+      border:4px solid rgba(255,255,255,0.3);
+      border-top-color:#fff;
+      animation:spin 0.8s linear infinite;
     }
+    @keyframes spin { to { transform:rotate(360deg); } }
 
-    .search-box:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
-    }
-
-    .filter-select {
-      padding: 6px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 12px;
-      width: 100%;
-      margin-bottom: 8px;
-    }
-
-    /* MODALS */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal.active {
-      display: flex;
-    }
-
-    .modal-content {
-      background: white;
-      border-radius: 8px;
-      padding: 20px;
-      max-width: 90%;
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: var(--shadow-lg);
-      position: relative;
-    }
-
-    .modal-close {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      background: #f0f0f0;
-      border: none;
-      border-radius: 50%;
-      width: 32px;
-      height: 32px;
-      cursor: pointer;
-      font-size: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* PROGRESS */
-    .progress-bar {
-      width: 100%;
-      height: 20px;
-      background: #e9ecef;
-      border-radius: 10px;
-      overflow: hidden;
-      margin: 8px 0;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--primary), #764ba2);
-      width: 0%;
-      transition: width 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    /* NOTIFICATIONS */
     .notification {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      padding: 12px 20px;
-      border-radius: 6px;
-      color: white;
-      font-size: 13px;
-      animation: slideIn 0.3s ease;
-      z-index: 999;
+      position:fixed;
+      bottom:16px;
+      right:16px;
+      padding:10px 14px;
+      border-radius:6px;
+      color:#fff;
+      font-size:12px;
+      z-index:2100;
+      animation:slideIn 0.25s ease;
     }
-
-    .notification.success {
-      background: var(--success);
-    }
-
-    .notification.error {
-      background: var(--danger);
-    }
-
-    .notification.info {
-      background: var(--info);
-    }
+    .notification.success { background:var(--success); }
+    .notification.error { background:var(--danger); }
+    .notification.info { background:var(--info); }
 
     @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+      from { transform:translateX(100%); opacity:0; }
+      to { transform:translateX(0); opacity:1; }
     }
 
-    /* FOOTER STATS */
-    .footer-stats {
-      margin: 8px 16px 16px;
-    }
-
-    .header-stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      font-size: 12px;
-    }
-
-    .header-stat {
-      background: rgba(255, 255, 255, 0.9);
-      padding: 6px 10px;
-      border-radius: 4px;
-      text-align: center;
-    }
-
-    .header-stat span {
-      color: #666;
-      font-size: 11px;
-    }
-
-    .header-stat strong {
-      display: block;
-      font-size: 16px;
-      margin-top: 4px;
-      color: #333;
-    }
-
-    /* LOADING */
-    .loading {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 2000;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .loading.active {
-      display: flex;
-    }
-
-    .spinner {
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @media (max-width: 1024px) {
-      .main {
-        grid-template-columns: 1fr;
-        padding: 12px;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .header h1 {
-        font-size: 16px;
-      }
-
-      #video {
-        height: 150px;
-      }
+    @media (max-width:900px) {
+      .main { grid-template-columns:1fr; }
+      #video { height:160px; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- HEADER -->
     <div class="header">
-      <h1>📊 Паспорт опробования скважин</h1>
+      <h1>📷 Сканирование проб</h1>
     </div>
 
-    <!-- MAIN CONTENT -->
     <div class="main">
-      <!-- LEFT: SCANNER -->
-      <div class="scanner-panel">
-        <h2>📷 Сканирование</h2>
+      <!-- ЛЕВАЯ ПАНЕЛЬ: сканер -->
+      <div class="card scanner-panel">
+        <h2>Сканирование</h2>
 
-        <!-- CAMERA -->
         <div class="camera-container">
           <video id="video" playsinline autoplay muted></video>
           <div class="camera-status" id="cameraStatus">📹 Инициализация...</div>
         </div>
 
-        <!-- SAMPLE (BARCODE / MANUAL) -->
-        <div class="scanner-input">
+        <div class="input-row">
           <input
+            id="sampleInput"
             type="text"
-            id="barcodeInput"
-            placeholder="Sample (штрихкод или ручной ввод)"
+            placeholder="Sample (штрихкод или вручную)"
             autocomplete="off"
           >
-          <button id="scanBtn" onclick="processScan()">✓ Записать</button>
+          <button onclick="processScan()">✓ Записать</button>
         </div>
 
-        <!-- MANUAL WELL NAME -->
-        <div class="scanner-input">
+        <div class="input-row">
           <input
-            type="text"
             id="wellNameInput"
+            type="text"
             placeholder="Скважина (ручной ввод)"
             autocomplete="off"
           >
         </div>
 
-        <!-- TYPE + BLOCK -->
-        <div class="scanner-input">
-          <select id="typeSelect" class="filter-select" style="max-width:120px;">
+        <div class="input-row">
+          <select id="typeSelect">
             <option value="520">520</option>
             <option value="360">360</option>
           </select>
           <input
-            type="text"
             id="blockInput"
-            placeholder="Блок"
+            type="text"
+            placeholder="Блок (сохраняется пока не измените)"
             autocomplete="off"
           >
         </div>
 
-        <!-- RESULT -->
         <div class="scanner-result" id="scanResult">
           Ожидание сканирования...
         </div>
 
-        <!-- SMALL STATS -->
-        <div class="scanner-stats">
-          <div class="scanner-stat">
+        <div class="small-stats">
+          <div class="small-stat">
             <span>Сегодня</span>
             <strong id="scannedToday">0</strong>
           </div>
-          <div class="scanner-stat">
+          <div class="small-stat">
             <span>Всего</span>
             <strong id="scannedTotal">0</strong>
           </div>
         </div>
 
-        <!-- ACTIONS -->
         <div class="btn-group">
-          <button class="btn btn-primary" onclick="showAddWellsModal()">➕ Добавить скважины</button>
-          <button class="btn btn-secondary" onclick="showDuplicatesModal()">🔄 Дубликаты</button>
-          <button class="btn btn-secondary" onclick="exportToCSV()">📥 Экспорт CSV</button>
+          <button class="btn btn-primary" onclick="exportToCSV()">📥 Экспорт CSV</button>
         </div>
       </div>
 
-      <!-- RIGHT: LIST -->
-      <div class="control-panel">
-        <div class="card">
-          <h3>🔎 Поиск и фильтры</h3>
+      <!-- ПРАВАЯ ПАНЕЛЬ: таблица -->
+      <div class="card">
+        <h3>Записанные пробы</h3>
+        <input
+          id="searchInput"
+          class="search-box"
+          type="text"
+          placeholder="Поиск по Sample или скважине..."
+          oninput="filterScans()"
+        >
+        <div class="wells-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Sample</th>
+                <th>Скважина</th>
+                <th>Тип / Блок</th>
+                <th>Дата</th>
+              </tr>
+            </thead>
+            <tbody id="scansTableBody">
+              <tr>
+                <td colspan="4" style="text-align:center; color:#999; padding:16px;">
+                  Нет записей
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <small id="scansCount" style="display:block; margin-top:4px; color:#666;">Записей: 0</small>
+
+        <div style="margin-top:8px; font-size:12px;">
+          <strong>Пользователь:</strong>
           <input
+            id="userNameInput"
             type="text"
-            class="search-box"
-            id="searchInput"
-            placeholder="Поиск по Sample или названию..."
-            onkeyup="filterWells()"
+            style="width:100%; padding:4px; margin-top:4px; border:1px solid #ddd; border-radius:4px;"
+            placeholder="Имя оператора"
           >
-          <select class="filter-select" id="filterStatus" onchange="filterWells()">
-            <option value="all">📌 Все</option>
-            <option value="sampled">✓ Опробованы</option>
-            <option value="not_sampled">○ Не опробованы</option>
-          </select>
-          <small style="color:#666;" id="wellsCount">Найдено: 0</small>
-        </div>
-
-        <div class="card">
-          <h3>📋 Список проб</h3>
-          <div class="wells-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Sample</th>
-                  <th>Скважина</th>
-                  <th>Тип / Блок</th>
-                  <th>Статус</th>
-                </tr>
-              </thead>
-              <tbody id="wellsTableBody">
-                <tr>
-                  <td colspan="4" style="text-align:center; color:#999; padding:20px;">
-                    Нет данных. Добавьте скважины или начните сканирование
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>ℹ️ Система</h3>
-          <div style="font-size:12px; display:grid; gap:8px;">
-            <div>
-              <strong>Статус:</strong>
-              <span id="connectionStatus" style="background:#f0f0f0; padding:2px 6px; border-radius:3px;">🔴 Проверка...</span>
-            </div>
-            <div>
-              <strong>Версия:</strong> 1.0 PWA
-            </div>
-            <div>
-              <strong>Пользователь:</strong>
-              <input
-                type="text"
-                id="userNameInput"
-                style="width:100%; padding:4px; margin-top:4px; border:1px solid #ddd; border-radius:3px;"
-                placeholder="Введите имя"
-              >
-            </div>
+          <div style="margin-top:4px;">
+            <strong>Статус соединения:</strong>
+            <span id="connectionStatus" style="background:#f0f0f0; padding:2px 6px; border-radius:3px;">🔴 Проверка...</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- FOOTER STATS -->
-    <div class="footer-stats card">
-      <div class="header-stats">
-        <div class="header-stat">
-          <span>Всего</span>
-          <strong id="totalWellsHeader">0</strong>
+    <!-- НИЖНЯЯ КАРТОЧКА СТАТИСТИКИ -->
+    <div class="footer-stats">
+      <div class="footer-grid">
+        <div class="footer-item">
+          <span>Всего записей</span>
+          <strong id="totalScansFooter">0</strong>
         </div>
-        <div class="header-stat">
-          <span>Опробовано</span>
-          <strong id="sampledWellsHeader">0</strong>
+        <div class="footer-item">
+          <span>Сегодня</span>
+          <strong id="todayScansFooter">0</strong>
         </div>
-        <div class="header-stat">
-          <span>Прогресс</span>
-          <strong id="progressHeader">0%</strong>
+        <div class="footer-item">
+          <span>Последний блок</span>
+          <strong id="lastBlockFooter">-</strong>
         </div>
       </div>
-      <div class="progress-bar" style="margin-top:10px;">
-        <div class="progress-fill" id="progressBar" style="width:0%"></div>
-      </div>
-      <small style="color:#666;" id="progressText">0 из 0 скважин</small>
     </div>
   </div>
 
-  <!-- MODAL: Добавить скважины -->
-  <div class="modal" id="addWellsModal">
-    <div class="modal-content">
-      <button class="modal-close" onclick="closeModal('addWellsModal')">✕</button>
-      <h2>➕ Добавить скважины</h2>
-      <p style="font-size:12px; color:#666; margin-bottom:12px;">
-        Формат: Sample, X, Y, Z, Скважина (по 5 строк на одну запись)
-      </p>
-      <textarea
-        id="wellsTextarea"
-        style="width:100%; height:200px; padding:10px; border:1px solid #ddd; border-radius:4px; font-family:monospace; margin-bottom:12px; font-size:12px;"
-        placeholder="S001&#10;1234.56&#10;5678.90&#10;100.2&#10;Скважина 1"
-      ></textarea>
-      <button class="btn btn-primary" onclick="addWellsFromText()" style="width:100%;">✓ Добавить</button>
-    </div>
-  </div>
-
-  <!-- MODAL: Дубликаты -->
-  <div class="modal" id="duplicatesModal">
-    <div class="modal-content">
-      <button class="modal-close" onclick="closeModal('duplicatesModal')">✕</button>
-      <h2>🔄 Генерирование дубликатов</h2>
-      <p style="font-size:12px; color:#666; margin-bottom:12px;">
-        Выберите кратность дубликатов
-      </p>
-      <select id="duplicateRatio" style="width:100%; padding:10px; margin-bottom:12px; border:1px solid #ddd; border-radius:4px;">
-        <option value="1:10">Каждая 10-я проба (1:10)</option>
-        <option value="1:20">Каждая 20-я проба (1:20)</option>
-        <option value="1:5">Каждая 5-я проба (1:5)</option>
-      </select>
-      <button class="btn btn-primary" onclick="generateDuplicatesFromModal()" style="width:100%;">✓ Создать дубликаты</button>
-      <button class="btn btn-secondary" onclick="exportDuplicates()" style="width:100%; margin-top:8px;">📥 Экспорт дубликатов</button>
-    </div>
-  </div>
-
-  <!-- LOADING -->
   <div class="loading" id="loading">
     <div class="spinner"></div>
   </div>
 
   <script>
-    // PWA
+    // Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js')
-        .catch(err => console.error('SW error:', err));
+        .catch(console.error);
     }
 
-    // CAMERA & BARCODE
+    // ===== CAMERA & BARCODE =====
     let codeReader = null;
     let cameraActive = false;
     let lastScannedBarcode = null;
@@ -808,21 +475,21 @@
     async function startCamera() {
       try {
         if (!codeReader) await initBarcodeScanner();
-        const cameras = await codeReader.listVideoInputDevices();
-        if (!cameras.length) {
+        const devices = await codeReader.listVideoInputDevices();
+        if (!devices.length) {
           showNotification('❌ Камера не найдена', 'error');
           updateCameraStatus('error');
           return;
         }
-        const selectedDeviceId = cameras[cameras.length - 1].deviceId;
+        const deviceId = devices[devices.length - 1].deviceId; // задняя
         cameraActive = true;
         updateCameraStatus('scanning');
-        await codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+        await codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
           if (result && cameraActive) {
-            const barcode = result.getText();
-            if (lastScannedBarcode !== barcode) {
-              lastScannedBarcode = barcode;
-              handleBarcodeDetected(barcode);
+            const code = result.getText();
+            if (lastScannedBarcode !== code) {
+              lastScannedBarcode = code;
+              handleBarcodeDetected(code);
             }
           }
         });
@@ -839,16 +506,16 @@
       updateCameraStatus('inactive');
     }
 
-    function updateCameraStatus(status) {
+    function updateCameraStatus(state) {
       const el = document.getElementById('cameraStatus');
-      el.classList.remove('scanning', 'inactive', 'error');
-      if (status === 'scanning') {
+      el.classList.remove('scanning','inactive','error');
+      if (state === 'scanning') {
         el.textContent = '🟢 Сканирует';
         el.classList.add('scanning');
-      } else if (status === 'inactive') {
+      } else if (state === 'inactive') {
         el.textContent = '⭕ Отключена';
         el.classList.add('inactive');
-      } else if (status === 'error') {
+      } else if (state === 'error') {
         el.textContent = '🔴 Ошибка';
         el.classList.add('error');
       } else {
@@ -856,19 +523,19 @@
       }
     }
 
-    function handleBarcodeDetected(barcode) {
-      const input = document.getElementById('barcodeInput');
+    function handleBarcodeDetected(code) {
+      const input = document.getElementById('sampleInput');
       if (input.value) return;
-      input.value = barcode;
+      input.value = code;
       input.classList.add('filled');
       stopCamera();
-      updateScanResult('info', `Отсканировано: ${barcode}`);
-      showNotification(`📷 Обнаружен: ${barcode}`, 'info');
+      updateScanResult('info', `Отсканировано: ${code}`);
+      showNotification(`📷 Обнаружен: ${code}`, 'info');
     }
 
-    // DB
+    // ===== IndexedDB (SCANS) =====
     const db = {
-      name: 'well_sampling_db',
+      name: 'sampling_scans_db',
       instance: null,
 
       async init() {
@@ -881,279 +548,139 @@
           };
           request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            if (!db.objectStoreNames.contains('wells')) {
-              const store = db.createObjectStore('wells', { keyPath: 'sample' });
-              store.createIndex('status', 'sampling_status', { unique: false });
-            }
-            if (!db.objectStoreNames.contains('duplicates')) {
-              db.createObjectStore('duplicates', { keyPath: 'duplicate_id' });
-            }
-            if (!db.objectStoreNames.contains('logs')) {
-              db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
+            if (!db.objectStoreNames.contains('scans')) {
+              db.createObjectStore('scans', { keyPath: 'id', autoIncrement: true });
             }
           };
         });
       },
 
-      async addWells(wellsData) {
-        const tx = this.instance.transaction('wells', 'readwrite');
-        const store = tx.objectStore('wells');
+      async addScan(scan) {
+        const tx = this.instance.transaction('scans', 'readwrite');
+        const store = tx.objectStore('scans');
         return new Promise(resolve => {
-          wellsData.forEach(w => store.put(w));
-          tx.oncomplete = () => resolve(wellsData.length);
-        });
-      },
-
-      async addOrUpdateWell(well) {
-        const tx = this.instance.transaction('wells', 'readwrite');
-        const store = tx.objectStore('wells');
-        return new Promise(resolve => {
-          store.put(well);
+          store.add(scan);
           tx.oncomplete = () => resolve();
         });
       },
 
-      async getAllWells() {
-        const tx = this.instance.transaction('wells', 'readonly');
-        const store = tx.objectStore('wells');
+      async getAllScans() {
+        const tx = this.instance.transaction('scans', 'readonly');
+        const store = tx.objectStore('scans');
         return new Promise(resolve => {
           const req = store.getAll();
-          req.onsuccess = () => resolve(req.result);
+          req.onsuccess = () => resolve(req.result || []);
         });
-      },
-
-      async addLog(sample, wellName, userName) {
-        const tx = this.instance.transaction('logs', 'readwrite');
-        const store = tx.objectStore('logs');
-        store.add({ sample, wellName, userName, timestamp: Date.now() });
-      },
-
-      async addDuplicate(dup) {
-        const tx = this.instance.transaction('duplicates', 'readwrite');
-        const store = tx.objectStore('duplicates');
-        return new Promise(resolve => {
-          store.add(dup);
-          tx.oncomplete = () => resolve();
-        });
-      },
-
-      async getAllDuplicates() {
-        const tx = this.instance.transaction('duplicates', 'readonly');
-        const store = tx.objectStore('duplicates');
-        return new Promise(resolve => {
-          const req = store.getAll();
-          req.onsuccess = () => resolve(req.result);
-        });
-      },
-
-      async getLogs(limit = 100) {
-        const tx = this.instance.transaction('logs', 'readonly');
-        const store = tx.objectStore('logs');
-        return new Promise(resolve => {
-          const req = store.getAll();
-          req.onsuccess = () => {
-            const logs = req.result.reverse().slice(0, limit);
-            resolve(logs);
-          };
-        });
-      },
-
-      async getStatistics() {
-        const wells = await this.getAllWells();
-        const sampled = wells.filter(w => w.sampling_status === 'sampled').length;
-        const completion = wells.length ? (sampled / wells.length) * 100 : 0;
-        return {
-          totalWells: wells.length,
-          sampledWells: sampled,
-          completionPercentage: completion.toFixed(1)
-        };
       }
     };
 
-    // UI helpers
-    let currentUser = localStorage.getItem('userName') || 'Сотрудник';
-    let allWells = [];
-    let filteredWells = [];
+    // ===== UI HELPERS =====
+    let currentUser = localStorage.getItem('scan_user') || 'Оператор';
+    let allScans = [];
+    let filteredScans = [];
 
-    function showNotification(msg, type = 'info') {
+    function showNotification(msg, type='info') {
       const el = document.createElement('div');
       el.className = `notification ${type}`;
       el.textContent = msg;
       document.body.appendChild(el);
       setTimeout(() => {
-        el.style.animation = 'slideIn 0.3s ease reverse';
-        setTimeout(() => el.remove(), 300);
-      }, 2500);
+        el.style.animation = 'slideIn 0.2s ease reverse';
+        setTimeout(() => el.remove(), 200);
+      }, 2200);
     }
 
-    function showLoading(show = true) {
+    function showLoading(show=true) {
       document.getElementById('loading').classList.toggle('active', show);
     }
 
-    function showModal(id) {
-      document.getElementById(id).classList.add('active');
-    }
-
-    function closeModal(id) {
-      document.getElementById(id).classList.remove('active');
-    }
-
-    function showAddWellsModal() {
-      showModal('addWellsModal');
-    }
-
-    function showDuplicatesModal() {
-      showModal('duplicatesModal');
-    }
-
-    function updateScanResult(type, message) {
+    function updateScanResult(type, msg) {
       const el = document.getElementById('scanResult');
       el.className = `scanner-result ${type}`;
-      el.textContent = message;
+      el.textContent = msg;
     }
 
-    async function updateStatistics() {
-      try {
-        allWells = await db.getAllWells();
-        const stats = await db.getStatistics();
-        document.getElementById('totalWellsHeader').textContent = stats.totalWells;
-        document.getElementById('sampledWellsHeader').textContent = stats.sampledWells;
-        document.getElementById('progressHeader').textContent = stats.completionPercentage + '%';
-        document.getElementById('progressBar').style.width = stats.completionPercentage + '%';
-        document.getElementById('progressText').textContent =
-          `${stats.sampledWells} из ${stats.totalWells} скважин`;
-
-        const today = new Date().toISOString().split('T')[0];
-        const logs = await db.getLogs();
-        const todayLogs = logs.filter(l =>
-          new Date(l.timestamp).toISOString().split('T')[0] === today
-        );
-        document.getElementById('scannedToday').textContent = todayLogs.length;
-        document.getElementById('scannedTotal').textContent = stats.sampledWells;
-
-        renderWells(allWells);
-      } catch (e) {
-        console.error(e);
-      }
+    async function refreshScans() {
+      allScans = await db.getAllScans();
+      renderScans(allScans);
+      updateStats(allScans);
     }
 
-    function renderWells(wells) {
-      const tbody = document.getElementById('wellsTableBody');
-      document.getElementById('wellsCount').textContent = `Найдено: ${wells.length}`;
-      if (!wells.length) {
+    function renderScans(scans) {
+      const tbody = document.getElementById('scansTableBody');
+      document.getElementById('scansCount').textContent = `Записей: ${scans.length}`;
+      if (!scans.length) {
         tbody.innerHTML =
-          '<tr><td colspan="4" style="text-align:center; color:#999; padding:20px;">Нет данных</td></tr>';
+          '<tr><td colspan="4" style="text-align:center; color:#999; padding:16px;">Нет записей</td></tr>';
         return;
       }
-      tbody.innerHTML = wells.map(w => `
+      const rows = scans.slice().reverse().map(s => `
         <tr>
-          <td><strong>${w.sample}</strong></td>
-          <td style="font-size:10px;">${w.well_name || ''}</td>
-          <td style="font-size:10px;">${w.type || ''} / ${w.block || ''}</td>
-          <td>
-            <span class="status-badge ${w.sampling_status}">
-              ${w.sampling_status === 'sampled' ? '✓' : '○'}
-            </span>
-          </td>
+          <td><strong>${s.sample}</strong></td>
+          <td style="font-size:11px;">${s.well_name || ''}</td>
+          <td style="font-size:11px;">${s.type || ''} / ${s.block || ''}</td>
+          <td style="font-size:11px;">${new Date(s.scanned_at).toLocaleString('ru-RU')}</td>
         </tr>
       `).join('');
+      tbody.innerHTML = rows;
     }
 
-    function filterWells() {
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      const status = document.getElementById('filterStatus').value;
-      filteredWells = allWells.filter(w => {
-        const mSearch = !search ||
-          (w.sample && w.sample.toLowerCase().includes(search)) ||
-          (w.well_name && w.well_name.toLowerCase().includes(search));
-        const mStatus = status === 'all' || w.sampling_status === status;
-        return mSearch && mStatus;
+    function updateStats(scans) {
+      const total = scans.length;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const today = scans.filter(s => new Date(s.scanned_at).toISOString().split('T')[0] === todayStr).length;
+      document.getElementById('scannedTotal').textContent = total;
+      document.getElementById('scannedToday').textContent = today;
+      document.getElementById('totalScansFooter').textContent = total;
+      document.getElementById('todayScansFooter').textContent = today;
+      const lastBlock = scans.length ? (scans[scans.length - 1].block || '-') : '-';
+      document.getElementById('lastBlockFooter').textContent = lastBlock;
+    }
+
+    function filterScans() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const scans = allScans.filter(s => {
+        return !q ||
+          (s.sample && s.sample.toLowerCase().includes(q)) ||
+          (s.well_name && s.well_name.toLowerCase().includes(q));
       });
-      renderWells(filteredWells);
+      renderScans(scans);
     }
 
-    async function addWellsFromText() {
-      const text = document.getElementById('wellsTextarea').value.trim();
-      if (!text) {
-        showNotification('⚠️ Введите данные', 'info');
-        return;
-      }
-      showLoading(true);
-      try {
-        const lines = text.split('\n').filter(l => l.trim());
-        const wells = [];
-        for (let i = 0; i < lines.length; i += 5) {
-          if (i + 4 < lines.length) {
-            wells.push({
-              sample: lines[i].trim(),
-              x_coord: parseFloat(lines[i + 1].trim()) || 0,
-              y_coord: parseFloat(lines[i + 2].trim()) || 0,
-              z_coord: parseFloat(lines[i + 3].trim()) || 0,
-              well_name: lines[i + 4].trim(),
-              block: '',
-              type: '',
-              sampling_status: 'not_sampled',
-              created_at: Date.now(),
-              sampled_at: null,
-              sampled_by: null
-            });
-          }
-        }
-        if (!wells.length) throw new Error('Нет валидных данных');
-        const added = await db.addWells(wells);
-        showNotification(`✓ Добавлено ${added} скважин`, 'success');
-        document.getElementById('wellsTextarea').value = '';
-        closeModal('addWellsModal');
-        await updateStatistics();
-      } catch (e) {
-        showNotification(`❌ Ошибка: ${e.message}`, 'error');
-      } finally {
-        showLoading(false);
-      }
-    }
-
+    // ===== MAIN ACTION: запись сканирования =====
     async function processScan() {
-      const sample = document.getElementById('barcodeInput').value.trim();
+      const sample = document.getElementById('sampleInput').value.trim();
       const wellName = document.getElementById('wellNameInput').value.trim();
       const block = document.getElementById('blockInput').value.trim();
       const type = document.getElementById('typeSelect').value;
 
       if (!sample) {
-        showNotification('⚠️ Введите Sample', 'info');
+        showNotification('⚠️ Введите Sample или отсканируйте', 'info');
         return;
       }
 
       showLoading(true);
       try {
-        const well = {
+        const scan = {
           sample,
-          well_name: wellName || sample,
+          well_name: wellName || '',
           block,
           type,
-          sampling_status: 'sampled',
-          sampled_at: Date.now(),
-          sampled_by: currentUser,
-          x_coord: 0,
-          y_coord: 0,
-          z_coord: 0,
-          total_depth: 0,
-          created_at: Date.now()
+          scanned_at: Date.now(),
+          scanned_by: currentUser
         };
+        await db.addScan(scan);
 
-        await db.addOrUpdateWell(well);
-        await db.addLog(sample, well.well_name, currentUser);
-
-        updateScanResult('success', `✓ Записано\nSample: ${sample}\nСкважина: ${well.well_name}`);
-
+        updateScanResult('success', `✓ Записано\nSample: ${sample}\nСкважина: ${scan.well_name}`);
         playBeep();
-        if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+        if ('vibrate' in navigator) navigator.vibrate([80,40,80]);
 
-        document.getElementById('barcodeInput').value = '';
-        document.getElementById('barcodeInput').classList.remove('filled');
+        document.getElementById('sampleInput').value = '';
+        document.getElementById('sampleInput').classList.remove('filled');
         document.getElementById('wellNameInput').value = '';
         lastScannedBarcode = null;
 
-        await updateStatistics();
+        await refreshScans();
         await startCamera();
       } catch (e) {
         console.error(e);
@@ -1171,7 +698,7 @@
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.frequency.value = 800;
+        osc.frequency.value = 900;
         gain.gain.setValueAtTime(0.3, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
         osc.start(ctx.currentTime);
@@ -1181,104 +708,31 @@
       }
     }
 
-    async function generateDuplicatesFromModal() {
-      const ratio = document.getElementById('duplicateRatio').value;
-      await generateDuplicates(ratio);
-      closeModal('duplicatesModal');
-    }
-
-    async function generateDuplicates(ratio = '1:10') {
-      showLoading(true);
-      try {
-        const wells = await db.getAllWells();
-        const sampled = wells.filter(w => w.sampling_status === 'sampled');
-        if (!sampled.length) {
-          showNotification('⚠️ Нет опробованных скважин', 'info');
-          return;
-        }
-        const [, denom] = ratio.split(':').map(Number);
-        let count = 0;
-        for (let i = 0; i < sampled.length; i++) {
-          if ((i + 1) % denom === 0) {
-            await db.addDuplicate({
-              duplicate_id: `${sampled[i].sample}_DUP_${Math.floor(i / denom) + 1}`,
-              original_sample_id: sampled[i].sample,
-              duplicate_ratio: ratio,
-              created_at: Date.now(),
-              analysis_status: 'not_analyzed'
-            });
-            count++;
-          }
-        }
-        showNotification(`✓ Создано ${count} дубликатов`, 'success');
-      } catch (e) {
-        showNotification(`❌ Ошибка: ${e.message}`, 'error');
-      } finally {
-        showLoading(false);
-      }
-    }
-
     async function exportToCSV() {
       showLoading(true);
       try {
-        const wells = await db.getAllWells();
-        if (!wells.length) {
+        const scans = await db.getAllScans();
+        if (!scans.length) {
           showNotification('⚠️ Нет данных для экспорта', 'info');
           return;
         }
-        const headers = ['Sample', 'Скважина', 'Тип', 'Блок', 'Статус', 'Дата', 'Сотрудник'];
-        const rows = wells.map(w => [
-          w.sample,
-          w.well_name || '',
-          w.type || '',
-          w.block || '',
-          w.sampling_status === 'sampled' ? 'Опробована' : 'Не опробована',
-          w.sampled_at ? new Date(w.sampled_at).toLocaleString('ru-RU') : '',
-          w.sampled_by || ''
+        const headers = ['Sample','Скважина','Тип','Блок','Дата','Сотрудник'];
+        const rows = scans.map(s => [
+          s.sample,
+          s.well_name || '',
+          s.type || '',
+          s.block || '',
+          new Date(s.scanned_at).toLocaleString('ru-RU'),
+          s.scanned_by || ''
         ]);
-        const csv = [headers, ...rows]
-          .map(r => r.map(c => `"${c}"`).join(','))
-          .join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
+        const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `Паспорт_опробования_${new Date().toISOString().split('T')[0]}.csv`);
-        link.click();
-        showNotification('✓ Файл экспортирован', 'success');
-      } catch (e) {
-        showNotification(`❌ Ошибка: ${e.message}`, 'error');
-      } finally {
-        showLoading(false);
-      }
-    }
-
-    async function exportDuplicates() {
-      showLoading(true);
-      try {
-        const duplicates = await db.getAllDuplicates();
-        if (!duplicates.length) {
-          showNotification('⚠️ Нет дубликатов для экспорта', 'info');
-          return;
-        }
-        const headers = ['ID дубликата', 'Sample', 'Кратность', 'Дата', 'Статус'];
-        const rows = duplicates.map(d => [
-          d.duplicate_id,
-          d.original_sample_id,
-          d.duplicate_ratio,
-          new Date(d.created_at).toLocaleString('ru-RU'),
-          d.analysis_status === 'analyzed' ? 'Проанализирован' : 'Не проанализирован'
-        ]);
-        const csv = [headers, ...rows]
-          .map(r => r.map(c => `"${c}"`).join(','))
-          .join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `Дубликаты_${new Date().toISOString().split('T')[0]}.csv`);
-        link.click();
-        showNotification('✓ Дубликаты экспортированы', 'success');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `scans_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        showNotification('✓ CSV выгружен', 'success');
       } catch (e) {
         showNotification(`❌ Ошибка: ${e.message}`, 'error');
       } finally {
@@ -1291,52 +745,48 @@
         await db.init();
         await initBarcodeScanner();
 
-        const savedUser = localStorage.getItem('userName');
-        if (savedUser) {
-          currentUser = savedUser;
-          document.getElementById('userNameInput').value = savedUser;
-        }
-        document.getElementById('userNameInput').addEventListener('change', () => {
-          currentUser = document.getElementById('userNameInput').value || 'Сотрудник';
-          localStorage.setItem('userName', currentUser);
+        const userInput = document.getElementById('userNameInput');
+        userInput.value = currentUser;
+        userInput.addEventListener('change', () => {
+          currentUser = userInput.value || 'Оператор';
+          localStorage.setItem('scan_user', currentUser);
         });
 
         const typeSelect = document.getElementById('typeSelect');
-        const savedType = localStorage.getItem('sample_type');
+        const savedType = localStorage.getItem('scan_type');
         if (savedType) typeSelect.value = savedType;
         typeSelect.addEventListener('change', () => {
-          localStorage.setItem('sample_type', typeSelect.value);
+          localStorage.setItem('scan_type', typeSelect.value);
         });
 
         const blockInput = document.getElementById('blockInput');
-        const savedBlock = localStorage.getItem('sample_block');
+        const savedBlock = localStorage.getItem('scan_block');
         if (savedBlock) blockInput.value = savedBlock;
         blockInput.addEventListener('change', () => {
-          localStorage.setItem('sample_block', blockInput.value);
+          localStorage.setItem('scan_block', blockInput.value);
         });
 
-        const updateStatus = () => {
+        const updateConn = () => {
           document.getElementById('connectionStatus').textContent =
             navigator.onLine ? '✅ Онлайн' : '🔴 Офлайн';
         };
-        window.addEventListener('online', updateStatus);
-        window.addEventListener('offline', updateStatus);
-        updateStatus();
+        window.addEventListener('online', updateConn);
+        window.addEventListener('offline', updateConn);
+        updateConn();
 
-        await updateStatistics();
-
-        document.getElementById('barcodeInput').addEventListener('keypress', (e) => {
+        document.getElementById('sampleInput').addEventListener('keypress', e => {
           if (e.key === 'Enter') processScan();
         });
 
-        console.log('App initialized');
+        await refreshScans();
+        console.log('App ready');
       } catch (e) {
         console.error(e);
         showNotification('❌ Ошибка инициализации', 'error');
       }
     });
 
-    setInterval(updateStatistics, 30000);
+    setInterval(refreshScans, 30000);
   </script>
 </body>
 </html>
