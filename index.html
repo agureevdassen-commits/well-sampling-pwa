@@ -921,19 +921,65 @@
     }
 
     async function processScan() {
-      const sample = document.getElementById('sampleInput').value.trim();
-      const wellName = document.getElementById('wellNameInput').value.trim();
-      const block = document.getElementById('blockInput').value.trim();
-      const type = document.getElementById('typeSelect').value;
+  const sample   = document.getElementById('sampleInput').value.trim();
+  const wellName = document.getElementById('wellNameInput').value.trim();
+  const block    = document.getElementById('blockInput').value.trim();
+  const type     = document.getElementById('typeSelect').value;
 
-      if (!sample) {
-        showNotification('⚠️ Введите Sample или отсканируйте', 'info');
-        return;
-      }
-      if (!wellName) {
-        showNotification('⚠️ Заполните поле "Скважина"', 'info');
-        return;
-      }
+  if (!sample) {
+    showNotification('⚠️ Введите Sample или отсканируйте', 'info');
+    return;
+  }
+  if (!wellName) {
+    showNotification('⚠️ Заполните поле "Скважина"', 'info');
+    document.getElementById('wellNameInput').focus();
+    return;
+  }
+  if (!block) {
+    showNotification('⚠️ Заполните поле "Блок"', 'info');
+    document.getElementById('blockInput').focus();
+    return;
+  }
+
+  showLoading(true);
+  try {
+    const scan = {
+      sample,
+      well_name: wellName,
+      block,
+      type,
+      scanned_at: Date.now(),
+      scanned_by: currentUser,
+      sync_status: 'pending'
+    };
+    await db.addScan(scan);
+
+    updateScanResult('success', `✓ Записано\nSample: ${sample}\nСкважина: ${scan.well_name}\nБлок: ${scan.block}`);
+    playBeep();
+    if ('vibrate' in navigator) navigator.vibrate([80,40,80]);
+
+    document.getElementById('sampleInput').value = '';
+    document.getElementById('sampleInput').classList.remove('filled');
+    // скважину и блок НЕ очищаем, если хочешь — оставь по логике работы:
+    // document.getElementById('wellNameInput').value = '';
+    // document.getElementById('blockInput').value = '';
+    lastScannedBarcode = null;
+
+    await refreshScans();
+    await syncPendingScans();
+
+    document.getElementById('sampleInput').focus();
+    await startCamera();
+  } catch (e) {
+    console.error(e);
+    await db.addLog({ level:'error', message:`processScan: ${e.message}` });
+    updateScanResult('error', `❌ Ошибка: ${e.message}`);
+    showNotification(`❌ Ошибка: ${e.message}`, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
 
       showLoading(true);
       try {
@@ -1184,3 +1230,4 @@
   </script>
 </body>
 </html>
+
