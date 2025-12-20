@@ -664,26 +664,36 @@
     }
 
     async function startCamera() {
-      try {
-        if (!codeReader) await initBarcodeScanner();
-        const devices = await codeReader.listVideoInputDevices();
-        if (!devices.length) {
-          showNotification('❌ Камера не найдена', 'error');
-          updateCameraStatus('error');
-          return;
-        }
-        const deviceId = devices[devices.length - 1].deviceId;
-        cameraActive = true;
-        updateCameraStatus('scanning');
+  try {
+    if (!codeReader) await initBarcodeScanner();
 
-        const constraints = {
-          video: {
-            deviceId: { exact: deviceId },
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            frameRate: { ideal: 10, max: 12 }
-          }
-        };
+    cameraActive = true;
+    updateCameraStatus('scanning');
+
+    const constraints = {
+      video: {
+        facingMode: { ideal: 'environment' }, // просим заднюю камеру
+        width:  { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 10, max: 12 }    // сниженный FPS
+      }
+    };
+
+    await codeReader.decodeFromConstraints(constraints, 'video', (result, err) => {
+      if (result && cameraActive) {
+        const code = result.getText();
+        if (lastScannedBarcode !== code) {
+          lastScannedBarcode = code;
+          handleBarcodeDetected(code);
+        }
+      }
+    });
+  } catch (e) {
+    console.error(e);
+    cameraActive = false;
+    updateCameraStatus('error');
+  }
+}
 
         await codeReader.decodeFromConstraints(constraints, 'video', (result, err) => {
           if (result && cameraActive) {
@@ -1186,3 +1196,4 @@
   </script>
 </body>
 </html>
+
