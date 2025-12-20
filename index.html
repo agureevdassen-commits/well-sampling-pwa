@@ -90,7 +90,7 @@
       gap:10px;
       padding:10px;
       overflow:hidden;
-      padding-bottom:60px; /* место под нижний toolbar */
+      padding-bottom:60px;
     }
 
     .card {
@@ -318,7 +318,7 @@
     .wells-table tr:hover { background:#f8f9fa; }
 
     .footer-stats {
-      margin:4px 10px 68px; /* сверху — чуть, снизу — под тулбар */
+      margin:4px 10px 68px;
       background:var(--surface);
       border-radius:8px;
       padding:8px 10px;
@@ -490,7 +490,6 @@
     </div>
 
     <div class="main">
-      <!-- ЛЕВО: сканирование -->
       <div class="card scanner-panel">
         <h2>Сканирование</h2>
 
@@ -553,7 +552,6 @@
         </div>
       </div>
 
-      <!-- ПРАВО: список проб (по умолчанию скрыт) -->
       <div id="samplesPanel" class="card hidden">
         <h3>Записанные пробы</h3>
 
@@ -610,7 +608,6 @@
       </div>
     </div>
 
-    <!-- Футер-статистика (скрывается кнопкой) -->
     <div id="footerStatsWrapper" class="footer-stats hidden">
       <div class="footer-grid">
         <div class="footer-item">
@@ -632,7 +629,6 @@
     </div>
   </div>
 
-  <!-- Нижний тулбар -->
   <div class="toolbar">
     <button class="toolbar-btn" onclick="toggleSamplesPanel()">📋 Пробы</button>
     <button class="toolbar-btn" onclick="toggleFooterStats()">📊 Статистика</button>
@@ -643,7 +639,6 @@
     <div class="spinner"></div>
   </div>
 
-  <!-- Диагностика -->
   <div id="diagnosticsModal" class="modal">
     <div class="modal-content">
       <button class="modal-close" onclick="closeDiagnostics()">✕</button>
@@ -656,7 +651,7 @@
   </div>
 
   <script>
-    const API_URL = '/api/scans/bulk';
+    const API_URL = '/api/scans/bulk'; // 404 значит, что на сервере нет такого маршрута
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').catch(console.error);
@@ -684,8 +679,6 @@
         cameraActive = true;
         updateCameraStatus('scanning');
 
-        // deviceId = undefined -> библиотека сама выберет «основную» камеру,
-        // стараясь использовать заднюю при наличии. [web:311]
         await codeReader.decodeFromVideoDevice(undefined, 'video', (result, err) => {
           if (result && cameraActive) {
             const code = result.getText();
@@ -937,12 +930,16 @@
         showNotification('⚠️ Введите Sample или отсканируйте', 'info');
         return;
       }
+      if (!wellName) {
+        showNotification('⚠️ Заполните поле "Скважина"', 'info');
+        return;
+      }
 
       showLoading(true);
       try {
         const scan = {
           sample,
-          well_name: wellName || '',
+          well_name: wellName,
           block,
           type,
           scanned_at: Date.now(),
@@ -1019,6 +1016,9 @@
         a.download = `scans_local_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         showNotification('✓ CSV выгружен (локально)', 'success');
+
+        // после экспорта перезапускаем камеру
+        await startCamera();
       } catch (e) {
         await db.addLog({ level:'error', message:`exportToCSV: ${e.message}` });
         showNotification(`❌ Ошибка: ${e.message}`, 'error');
