@@ -981,43 +981,6 @@
 }
 
 
-      showLoading(true);
-      try {
-        const scan = {
-          sample,
-          well_name: wellName,
-          block,
-          type,
-          scanned_at: Date.now(),
-          scanned_by: currentUser,
-          sync_status: 'pending'
-        };
-        await db.addScan(scan);
-
-        updateScanResult('success', `✓ Записано\nSample: ${sample}\nСкважина: ${scan.well_name}`);
-        playBeep();
-        if ('vibrate' in navigator) navigator.vibrate([80,40,80]);
-
-        document.getElementById('sampleInput').value = '';
-        document.getElementById('sampleInput').classList.remove('filled');
-        document.getElementById('wellNameInput').value = '';
-        lastScannedBarcode = null;
-
-        await refreshScans();
-        await syncPendingScans();
-
-        document.getElementById('sampleInput').focus();
-        await startCamera();
-      } catch (e) {
-        console.error(e);
-        await db.addLog({ level:'error', message:`processScan: ${e.message}` });
-        updateScanResult('error', `❌ Ошибка: ${e.message}`);
-        showNotification(`❌ Ошибка: ${e.message}`, 'error');
-      } finally {
-        showLoading(false);
-      }
-    }
-
     function playBeep() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1230,4 +1193,5 @@
   </script>
 </body>
 </html>
+
 
