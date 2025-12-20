@@ -594,505 +594,519 @@
   </div>
 
   <script>
-    const API_URL = '/api/scans/bulk';
+  const API_URL = '/api/scans/bulk';
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js').catch(console.error);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js').catch(console.error);
+  }
+
+  let codeReader = null;
+  let cameraActive = false;
+  let lastScannedBarcode = null;
+  let currentUser = localStorage.getItem('scan_user') || 'Оператор';
+  let allScans = [];
+  let lastServerCount = null;
+
+  async function initBarcodeScanner() {
+    try {
+      const ZXing = window.ZXing;
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      setTimeout(() => startCamera(), 400);
+    } catch (e) {
+      console.error(e);
+      updateCameraStatus('error');
     }
+  }
 
-    let codeReader = null;
-    let cameraActive = false;
-    let lastScannedBarcode = null;
-    let currentUser = localStorage.getItem('scan_user') || 'Оператор';
-    let allScans = [];
-    let lastServerCount = null;
-
-    async function initBarcodeScanner() {
-      try {
-        const ZXing = window.ZXing;
-        codeReader = new ZXing.BrowserMultiFormatReader();
-        setTimeout(() => startCamera(), 400);
-      } catch (e) {
-        console.error(e);
-        updateCameraStatus('error');
-      }
-    }
-
-    async function startCamera() {
-      try {
-        if (!codeReader) await initBarcodeScanner();
-        cameraActive = true;
-        updateCameraStatus('scanning');
-        await codeReader.decodeFromVideoDevice(undefined, 'video', (result, err) => {
-          if (result && cameraActive) {
-            const code = result.getText();
-            if (lastScannedBarcode !== code) {
-              lastScannedBarcode = code;
-              handleBarcodeDetected(code);
-            }
+  async function startCamera() {
+    try {
+      if (!codeReader) await initBarcodeScanner();
+      cameraActive = true;
+      updateCameraStatus('scanning');
+      await codeReader.decodeFromVideoDevice(undefined, 'video', (result, err) => {
+        if (result && cameraActive) {
+          const code = result.getText();
+          if (lastScannedBarcode !== code) {
+            lastScannedBarcode = code;
+            handleBarcodeDetected(code);
           }
-        });
-      } catch (e) {
-        console.error(e);
-        cameraActive = false;
-        updateCameraStatus('error');
-      }
-    }
-
-    function stopCamera() {
-      if (codeReader) codeReader.reset();
+        }
+      });
+    } catch (e) {
+      console.error(e);
       cameraActive = false;
-      updateCameraStatus('inactive');
+      updateCameraStatus('error');
+    }
+  }
+
+  function stopCamera() {
+    if (codeReader) codeReader.reset();
+    cameraActive = false;
+    updateCameraStatus('inactive');
+  }
+
+  function updateCameraStatus(state) {
+    const el = document.getElementById('cameraStatus');
+    el.classList.remove('scanning','inactive','error');
+    if (state === 'scanning') {
+      el.textContent = '🟢 Сканирует';
+      el.classList.add('scanning');
+    } else if (state === 'inactive') {
+      el.textContent = '⭕ Отключена';
+      el.classList.add('inactive');
+    } else if (state === 'error') {
+      el.textContent = '🔴 Ошибка камеры';
+      el.classList.add('error');
+    } else {
+      el.textContent = '📹 Инициализация...';
+    }
+  }
+
+  // Сканер ТОЛЬКО подставляет штрихкод, НЕ пишет в БД
+  function handleBarcodeDetected(code) {
+    const input = document.getElementById('sampleInput');
+    input.value = code;
+    input.classList.add('filled');
+    stopCamera();
+    updateScanResult('info', `Отсканировано: ${code}`);
+    showNotification(`📷 Обнаружен: ${code}`, 'info');
+  }
+
+  const db = {
+    name: 'sampling_scans_db_v2',
+    instance: null,
+
+    async init() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(this.name, 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => { this.instance = request.result; resolve(this.instance); };
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('scans')) {
+            const store = db.createObjectStore('scans', { keyPath: 'id', autoIncrement: true });
+            store.createIndex('sync_status', 'sync_status', { unique: false });
+            store.createIndex('scanned_at', 'scanned_at', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('logs')) {
+            db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
+          }
+        };
+      });
+    },
+
+    async addScan(scan) {
+      const tx = this.instance.transaction('scans', 'readwrite');
+      const store = tx.objectStore('scans');
+      return new Promise(resolve => { store.add(scan); tx.oncomplete = () => resolve(); });
+    },
+
+    async getAllScans() {
+      const tx = this.instance.transaction('scans', 'readonly');
+      const store = tx.objectStore('scans');
+      return new Promise(resolve => {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+      });
+    },
+
+    async getPendingScans() {
+      const tx = this.instance.transaction('scans', 'readonly');
+      const store = tx.objectStore('scans');
+      const idx = store.index('sync_status');
+      return new Promise(resolve => {
+        const req = idx.getAll('pending');
+        req.onsuccess = () => resolve(req.result || []);
+      });
+    },
+
+    async markSynced(ids, serverIds = []) {
+      if (!ids.length) return;
+      const tx = this.instance.transaction('scans', 'readwrite');
+      const store = tx.objectStore('scans');
+      await Promise.all(ids.map((id, i) => new Promise(res => {
+        const req = store.get(id);
+        req.onsuccess = () => {
+          const rec = req.result;
+          if (rec) {
+            rec.sync_status = 'synced';
+            if (serverIds[i]) rec.server_id = serverIds[i];
+            store.put(rec);
+          }
+          res();
+        };
+      })));
+    },
+
+    async addLog(entry) {
+      const tx = this.instance.transaction('logs', 'readwrite');
+      const store = tx.objectStore('logs');
+      store.add({ ...entry, ts: Date.now() });
+    },
+
+    async getLogs(limit = 100) {
+      const tx = this.instance.transaction('logs', 'readonly');
+      const store = tx.objectStore('logs');
+      return new Promise(resolve => {
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const all = req.result || [];
+          resolve(all.slice(-limit));
+        };
+      });
+    },
+
+    async clearLogs() {
+      const tx = this.instance.transaction('logs', 'readwrite');
+      const store = tx.objectStore('logs');
+      return new Promise(resolve => {
+        const req = store.clear();
+        req.onsuccess = () => resolve();
+      });
+    }
+  };
+
+  function showNotification(msg, type='info') {
+    const el = document.createElement('div');
+    el.className = `notification ${type}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => {
+      el.style.animation = 'slideIn 0.2s ease reverse';
+      setTimeout(() => el.remove(), 200);
+    }, 2200);
+  }
+
+  function showLoading(show=true) {
+    document.getElementById('loading').classList.toggle('active', show);
+  }
+
+  function updateScanResult(type, msg) {
+    const el = document.getElementById('scanResult');
+    el.className = `scanner-result ${type}`;
+    el.textContent = msg;
+  }
+
+  async function refreshScans() {
+    allScans = await db.getAllScans();
+    renderScans(allScans);
+    updateStats(allScans);
+    updateSyncIndicator();
+  }
+
+  function renderScans(scans) {
+    const tbody = document.getElementById('scansTableBody');
+    document.getElementById('scansCount').textContent = `Записей: ${scans.length}`;
+    if (!scans.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999; padding:16px;">Нет записей</td></tr>';
+      return;
+    }
+    tbody.innerHTML = scans.slice().reverse().map(s => `
+      <tr>
+        <td><strong>${s.sample}</strong>${s.server_id ? `<br><span style="font-size:9px;color:#999;">#${s.server_id}</span>` : ''}</td>
+        <td style="font-size:11px;">${s.well_name || ''}</td>
+        <td style="font-size:11px;">${s.type || ''} / ${s.block || ''}</td>
+        <td style="font-size:11px;">${new Date(s.scanned_at).toLocaleString('ru-RU')}</td>
+      </tr>
+    `).join('');
+  }
+
+  function updateStats(scans) {
+    const total = scans.length;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const today = scans.filter(s =>
+      new Date(s.scanned_at).toISOString().split('T')[0] === todayStr
+    ).length;
+    document.getElementById('scannedTotal').textContent = total;
+    document.getElementById('scannedToday').textContent = today;
+    document.getElementById('totalScansFooter').textContent = total;
+    document.getElementById('todayScansFooter').textContent = today;
+    const lastBlock = scans.length ? (scans[scans.length - 1].block || '-') : '-';
+    document.getElementById('lastBlockFooter').textContent = lastBlock;
+  }
+
+  function filterScans() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const pendingOnly = document.getElementById('pendingOnlyCheckbox').checked;
+    let scans = allScans;
+    if (pendingOnly) scans = scans.filter(s => s.sync_status === 'pending');
+    scans = scans.filter(s =>
+      !q ||
+      (s.sample && s.sample.toLowerCase().includes(q)) ||
+      (s.well_name && s.well_name.toLowerCase().includes(q))
+    );
+    renderScans(scans);
+  }
+
+  function toggleFooterStats() {
+    document.getElementById('footerStatsWrapper').classList.toggle('hidden');
+  }
+  function toggleSamplesPanel() {
+    document.getElementById('samplesPanel').classList.toggle('hidden');
+  }
+
+  // ЕДИНСТВЕННАЯ точка записи в БД
+  async function saveScanToDb(scan) {
+    // Жёсткая проверка прямо перед IndexedDB
+    if (!scan.sample) return;
+    if (!scan.block || !scan.block.trim()) return;
+    if (!scan.well_name || !scan.well_name.trim()) return;
+
+    await db.addScan(scan);
+  }
+
+  async function processScan() {
+    const sample   = document.getElementById('sampleInput').value.trim();
+    const wellName = document.getElementById('wellNameInput').value.trim();
+    const block    = document.getElementById('blockInput').value.trim();
+    const type     = document.getElementById('typeSelect').value;
+
+    if (!sample) {
+      showNotification('⚠️ Введите Sample или отсканируйте', 'info');
+      document.getElementById('sampleInput').focus();
+      return;
+    }
+    if (!block) {
+      showNotification('⚠️ Заполните поле "Блок"', 'info');
+      document.getElementById('blockInput').focus();
+      return;
+    }
+    if (!wellName) {
+      showNotification('⚠️ Заполните поле "Скважина"', 'info');
+      document.getElementById('wellNameInput').focus();
+      return;
     }
 
-    function updateCameraStatus(state) {
-      const el = document.getElementById('cameraStatus');
-      el.classList.remove('scanning','inactive','error');
-      if (state === 'scanning') {
-        el.textContent = '🟢 Сканирует';
-        el.classList.add('scanning');
-      } else if (state === 'inactive') {
-        el.textContent = '⭕ Отключена';
-        el.classList.add('inactive');
-      } else if (state === 'error') {
-        el.textContent = '🔴 Ошибка камеры';
-        el.classList.add('error');
-      } else {
-        el.textContent = '📹 Инициализация...';
+    showLoading(true);
+    try {
+      const scan = {
+        sample,
+        well_name: wellName,
+        block,
+        type,
+        scanned_at: Date.now(),
+        scanned_by: currentUser,
+        sync_status: 'pending'
+      };
+
+      await saveScanToDb(scan);
+
+      updateScanResult('success', `✓ Записано\nSample: ${sample}\nСкважина: ${scan.well_name}\nБлок: ${scan.block}`);
+      playBeep();
+      if ('vibrate' in navigator) navigator.vibrate([80,40,80]);
+
+      document.getElementById('sampleInput').value = '';
+      document.getElementById('sampleInput').classList.remove('filled');
+      lastScannedBarcode = null;
+
+      await refreshScans();
+      await syncPendingScans();
+
+      document.getElementById('sampleInput').focus();
+      await startCamera();
+    } catch (e) {
+      console.error(e);
+      await db.addLog({ level:'error', message:`processScan: ${e.message}` });
+      updateScanResult('error', `❌ Ошибка: ${e.message}`);
+      showNotification(`❌ Ошибка: ${e.message}`, 'error');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  function playBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 900;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.1);
+    } catch (e) { console.error(e); }
+  }
+
+  async function exportToCSV() {
+    showLoading(true);
+    try {
+      const scans = await db.getAllScans();
+      if (!scans.length) {
+        showNotification('⚠️ Нет данных для экспорта', 'info');
+        return;
       }
+      const headers = ['Sample','Скважина','Тип','Блок','Дата','Сотрудник','SyncStatus','ServerID'];
+      const rows = scans.map(s => [
+        s.sample,
+        s.well_name || '',
+        s.type || '',
+        s.block || '',
+        new Date(s.scanned_at).toLocaleString('ru-RU'),
+        s.scanned_by || '',
+        s.sync_status || '',
+        s.server_id || ''
+      ]);
+      const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `scans_local_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      showNotification('✓ CSV выгружен (локально)', 'success');
+      await startCamera();
+    } catch (e) {
+      await db.addLog({ level:'error', message:`exportToCSV: ${e.message}` });
+      showNotification(`❌ Ошибка: ${e.message}`, 'error');
+    } finally {
+      showLoading(false);
     }
+  }
 
-    function handleBarcodeDetected(code) {
-      const input = document.getElementById('sampleInput');
-      input.value = code;
-      input.classList.add('filled');
-      stopCamera(); // просто подставляем код, НЕ пишем в БД
-      updateScanResult('info', `Отсканировано: ${code}`);
-      showNotification(`📷 Обнаружен: ${code}`, 'info');
-    }
+  async function syncPendingScans() {
+    if (!navigator.onLine) { updateSyncIndicator(); return; }
+    try {
+      const pending = await db.getPendingScans();
+      if (!pending.length) { updateSyncIndicator(0); return; }
 
-    const db = {
-      name: 'sampling_scans_db_v2',
-      instance: null,
+      const deviceId = localStorage.getItem('device_id') ||
+        (function () {
+          const id = 'dev-' + Math.random().toString(36).slice(2);
+          localStorage.setItem('device_id', id);
+          return id;
+        })();
 
-      async init() {
-        return new Promise((resolve, reject) => {
-          const request = indexedDB.open(this.name, 1);
-          request.onerror = () => reject(request.error);
-          request.onsuccess = () => { this.instance = request.result; resolve(this.instance); };
-          request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains('scans')) {
-              const store = db.createObjectStore('scans', { keyPath: 'id', autoIncrement: true });
-              store.createIndex('sync_status', 'sync_status', { unique: false });
-              store.createIndex('scanned_at', 'scanned_at', { unique: false });
-            }
-            if (!db.objectStoreNames.contains('logs')) {
-              db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
-            }
-          };
-        });
-      },
+      const payload = pending.map(p => ({
+        device_id: deviceId,
+        sample: p.sample,
+        well_name: p.well_name,
+        block: p.block,
+        type: p.type,
+        scanned_at: p.scanned_at,
+        scanned_by: p.scanned_by,
+        local_id: p.id
+      }));
 
-      async addScan(scan) {
-        const tx = this.instance.transaction('scans', 'readwrite');
-        const store = tx.objectStore('scans');
-        return new Promise(resolve => { store.add(scan); tx.oncomplete = () => resolve(); });
-      },
+      const res = await fetch(API_URL, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
 
-      async getAllScans() {
-        const tx = this.instance.transaction('scans', 'readonly');
-        const store = tx.objectStore('scans');
-        return new Promise(resolve => {
-          const req = store.getAll();
-          req.onsuccess = () => resolve(req.result || []);
-        });
-      },
-
-      async getPendingScans() {
-        const tx = this.instance.transaction('scans', 'readonly');
-        const store = tx.objectStore('scans');
-        const idx = store.index('sync_status');
-        return new Promise(resolve => {
-          const req = idx.getAll('pending');
-          req.onsuccess = () => resolve(req.result || []);
-        });
-      },
-
-      async markSynced(ids, serverIds = []) {
-        if (!ids.length) return;
-        const tx = this.instance.transaction('scans', 'readwrite');
-        const store = tx.objectStore('scans');
-        await Promise.all(ids.map((id, i) => new Promise(res => {
-          const req = store.get(id);
-          req.onsuccess = () => {
-            const rec = req.result;
-            if (rec) {
-              rec.sync_status = 'synced';
-              if (serverIds[i]) rec.server_id = serverIds[i];
-              store.put(rec);
-            }
-            res();
-          };
-        })));
-      },
-
-      async addLog(entry) {
-        const tx = this.instance.transaction('logs', 'readwrite');
-        const store = tx.objectStore('logs');
-        store.add({ ...entry, ts: Date.now() });
-      },
-
-      async getLogs(limit = 100) {
-        const tx = this.instance.transaction('logs', 'readonly');
-        const store = tx.objectStore('logs');
-        return new Promise(resolve => {
-          const req = store.getAll();
-          req.onsuccess = () => {
-            const all = req.result || [];
-            resolve(all.slice(-limit));
-          };
-        });
-      },
-
-      async clearLogs() {
-        const tx = this.instance.transaction('logs', 'readwrite');
-        const store = tx.objectStore('logs');
-        return new Promise(resolve => {
-          const req = store.clear();
-          req.onsuccess = () => resolve();
-        });
+      let serverResponse = {};
+      try { serverResponse = await res.json(); } catch (_) {}
+      const serverIds = serverResponse.server_ids || [];
+      if (typeof serverResponse.total_on_server === 'number') {
+        lastServerCount = serverResponse.total_on_server;
       }
-    };
 
-    function showNotification(msg, type='info') {
-      const el = document.createElement('div');
-      el.className = `notification ${type}`;
-      el.textContent = msg;
-      document.body.appendChild(el);
-      setTimeout(() => {
-        el.style.animation = 'slideIn 0.2s ease reverse';
-        setTimeout(() => el.remove(), 200);
-      }, 2200);
-    }
-
-    function showLoading(show=true) {
-      document.getElementById('loading').classList.toggle('active', show);
-    }
-
-    function updateScanResult(type, msg) {
-      const el = document.getElementById('scanResult');
-      el.className = `scanner-result ${type}`;
-      el.textContent = msg;
-    }
-
-    async function refreshScans() {
-      allScans = await db.getAllScans();
-      renderScans(allScans);
-      updateStats(allScans);
+      await db.markSynced(pending.map(p => p.id), serverIds);
+      await refreshScans();
+      await db.addLog({ level:'info', message:`sync ok: ${pending.length}` });
+      showNotification(`✓ Синхронизировано: ${pending.length}`, 'success');
+    } catch (e) {
+      console.error('Sync error', e);
+      await db.addLog({ level:'error', message:`syncPendingScans: ${e.message}` });
+    } finally {
       updateSyncIndicator();
     }
+  }
 
-    function renderScans(scans) {
-      const tbody = document.getElementById('scansTableBody');
-      document.getElementById('scansCount').textContent = `Записей: ${scans.length}`;
-      if (!scans.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999; padding:16px;">Нет записей</td></tr>';
-        return;
-      }
-      tbody.innerHTML = scans.slice().reverse().map(s => `
-        <tr>
-          <td><strong>${s.sample}</strong>${s.server_id ? `<br><span style="font-size:9px;color:#999;">#${s.server_id}</span>` : ''}</td>
-          <td style="font-size:11px;">${s.well_name || ''}</td>
-          <td style="font-size:11px;">${s.type || ''} / ${s.block || ''}</td>
-          <td style="font-size:11px;">${new Date(s.scanned_at).toLocaleString('ru-RU')}</td>
-        </tr>
-      `).join('');
+  async function updateSyncIndicator() {
+    const indicator = document.getElementById('syncIndicator');
+    const scans = allScans;
+    const localCount = scans.length;
+    const pendingCount = scans.filter(s => s.sync_status === 'pending').length;
+    let text = `⇅ локально ${localCount}, в ожидании ${pendingCount}`;
+    if (pendingCount > 0) {
+      indicator.classList.add('pending');
+      indicator.classList.remove('ok');
+    } else {
+      indicator.classList.add('ok');
+      indicator.classList.remove('pending');
     }
+    if (lastServerCount != null) text += ` / сервер ${lastServerCount}`;
+    indicator.textContent = text;
+  }
 
-    function updateStats(scans) {
-      const total = scans.length;
-      const todayStr = new Date().toISOString().split('T')[0];
-      const today = scans.filter(s =>
-        new Date(s.scanned_at).toISOString().split('T')[0] === todayStr
-      ).length;
-      document.getElementById('scannedTotal').textContent = total;
-      document.getElementById('scannedToday').textContent = today;
-      document.getElementById('totalScansFooter').textContent = total;
-      document.getElementById('todayScansFooter').textContent = today;
-      const lastBlock = scans.length ? (scans[scans.length - 1].block || '-') : '-';
-      document.getElementById('lastBlockFooter').textContent = lastBlock;
+  async function openDiagnostics() {
+    const logs = await db.getLogs();
+    const box = document.getElementById('diagnosticsLog');
+    if (!logs.length) box.textContent = 'Журнал пуст.';
+    else {
+      box.textContent = logs.map(l =>
+        `${new Date(l.ts).toLocaleString('ru-RU')} [${l.level}]: ${l.message}`
+      ).join('\n');
     }
+    document.getElementById('diagnosticsModal').classList.add('active');
+  }
+  function closeDiagnostics() {
+    document.getElementById('diagnosticsModal').classList.remove('active');
+  }
+  async function clearDiagnosticsLog() {
+    await db.clearLogs();
+    document.getElementById('diagnosticsLog').textContent = 'Журнал пуст.';
+    showNotification('Журнал очищен', 'info');
+  }
 
-    function filterScans() {
-      const q = document.getElementById('searchInput').value.toLowerCase();
-      const pendingOnly = document.getElementById('pendingOnlyCheckbox').checked;
-      let scans = allScans;
-      if (pendingOnly) scans = scans.filter(s => s.sync_status === 'pending');
-      scans = scans.filter(s =>
-        !q ||
-        (s.sample && s.sample.toLowerCase().includes(q)) ||
-        (s.well_name && s.well_name.toLowerCase().includes(q))
-      );
-      renderScans(scans);
-    }
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      await db.init();
+      await initBarcodeScanner();
 
-    function toggleFooterStats() {
-      document.getElementById('footerStatsWrapper').classList.toggle('hidden');
-    }
-    function toggleSamplesPanel() {
-      document.getElementById('samplesPanel').classList.toggle('hidden');
-    }
+      const userInput = document.getElementById('userNameInput');
+      userInput.value = currentUser;
+      userInput.addEventListener('change', () => {
+        currentUser = userInput.value || 'Оператор';
+        localStorage.setItem('scan_user', currentUser);
+      });
 
-    async function processScan() {
-      const sample   = document.getElementById('sampleInput').value.trim();
-      const wellName = document.getElementById('wellNameInput').value.trim();
-      const block    = document.getElementById('blockInput').value.trim();
-      const type     = document.getElementById('typeSelect').value;
+      const typeSelect = document.getElementById('typeSelect');
+      const savedType = localStorage.getItem('scan_type');
+      if (savedType) typeSelect.value = savedType;
+      typeSelect.addEventListener('change', () => {
+        localStorage.setItem('scan_type', typeSelect.value);
+      });
 
-      if (!sample) {
-        showNotification('⚠️ Введите Sample или отсканируйте', 'info');
-        document.getElementById('sampleInput').focus();
-        return;
-      }
-      if (!block) {
-        showNotification('⚠️ Заполните поле "Блок"', 'info');
-        document.getElementById('blockInput').focus();
-        return;
-      }
-      if (!wellName) {
-        showNotification('⚠️ Заполните поле "Скважина"', 'info');
-        document.getElementById('wellNameInput').focus();
-        return;
-      }
+      const blockInput = document.getElementById('blockInput');
+      const savedBlock = localStorage.getItem('scan_block');
+      if (savedBlock) blockInput.value = savedBlock;
+      blockInput.addEventListener('change', () => {
+        localStorage.setItem('scan_block', blockInput.value);
+      });
 
-      showLoading(true);
-      try {
-        const scan = {
-          sample,
-          well_name: wellName,
-          block,
-          type,
-          scanned_at: Date.now(),
-          scanned_by: currentUser,
-          sync_status: 'pending'
-        };
-        await db.addScan(scan);
-
-        updateScanResult('success', `✓ Записано\nSample: ${sample}\nСкважина: ${scan.well_name}\nБлок: ${scan.block}`);
-        playBeep();
-        if ('vibrate' in navigator) navigator.vibrate([80,40,80]);
-
-        document.getElementById('sampleInput').value = '';
-        document.getElementById('sampleInput').classList.remove('filled');
-        lastScannedBarcode = null;
-
-        await refreshScans();
-        await syncPendingScans();
-
-        document.getElementById('sampleInput').focus();
-        await startCamera();
-      } catch (e) {
-        console.error(e);
-        await db.addLog({ level:'error', message:`processScan: ${e.message}` });
-        updateScanResult('error', `❌ Ошибка: ${e.message}`);
-        showNotification(`❌ Ошибка: ${e.message}`, 'error');
-      } finally {
-        showLoading(false);
-      }
-    }
-
-    function playBeep() {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 900;
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.1);
-      } catch (e) { console.error(e); }
-    }
-
-    async function exportToCSV() {
-      showLoading(true);
-      try {
-        const scans = await db.getAllScans();
-        if (!scans.length) {
-          showNotification('⚠️ Нет данных для экспорта', 'info');
-          return;
+      const updateConn = () => {
+        const el = document.getElementById('connectionStatus');
+        if (navigator.onLine) {
+          el.textContent = '✅ Онлайн (данные синхронизируются)';
+          syncPendingScans();
+        } else {
+          el.textContent = '🔴 Офлайн (записи сохраняются в телефоне)';
         }
-        const headers = ['Sample','Скважина','Тип','Блок','Дата','Сотрудник','SyncStatus','ServerID'];
-        const rows = scans.map(s => [
-          s.sample,
-          s.well_name || '',
-          s.type || '',
-          s.block || '',
-          new Date(s.scanned_at).toLocaleString('ru-RU'),
-          s.scanned_by || '',
-          s.sync_status || '',
-          s.server_id || ''
-        ]);
-        const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-        const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `scans_local_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        showNotification('✓ CSV выгружен (локально)', 'success');
-        await startCamera();
-      } catch (e) {
-        await db.addLog({ level:'error', message:`exportToCSV: ${e.message}` });
-        showNotification(`❌ Ошибка: ${e.message}`, 'error');
-      } finally {
-        showLoading(false);
-      }
+      };
+      window.addEventListener('online', updateConn);
+      window.addEventListener('offline', updateConn);
+      updateConn();
+
+      document.getElementById('sampleInput').addEventListener('keypress', e => {
+        if (e.key === 'Enter') processScan();
+      });
+
+      await refreshScans();
+      document.getElementById('sampleInput').focus();
+    } catch (e) {
+      console.error(e);
+      await db.addLog({ level:'error', message:`init: ${e.message}` });
+      showNotification('❌ Ошибка инициализации', 'error');
     }
+  });
 
-    async function syncPendingScans() {
-      if (!navigator.onLine) { updateSyncIndicator(); return; }
-      try {
-        const pending = await db.getPendingScans();
-        if (!pending.length) { updateSyncIndicator(0); return; }
+  setInterval(refreshScans, 30000);
+</script>
 
-        const deviceId = localStorage.getItem('device_id') ||
-          (function () {
-            const id = 'dev-' + Math.random().toString(36).slice(2);
-            localStorage.setItem('device_id', id);
-            return id;
-          })();
-
-        const payload = pending.map(p => ({
-          device_id: deviceId,
-          sample: p.sample,
-          well_name: p.well_name,
-          block: p.block,
-          type: p.type,
-          scanned_at: p.scanned_at,
-          scanned_by: p.scanned_by,
-          local_id: p.id
-        }));
-
-        const res = await fetch(API_URL, {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify(payload)
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-
-        let serverResponse = {};
-        try { serverResponse = await res.json(); } catch (_) {}
-        const serverIds = serverResponse.server_ids || [];
-        if (typeof serverResponse.total_on_server === 'number') {
-          lastServerCount = serverResponse.total_on_server;
-        }
-
-        await db.markSynced(pending.map(p => p.id), serverIds);
-        await refreshScans();
-        await db.addLog({ level:'info', message:`sync ok: ${pending.length}` });
-        showNotification(`✓ Синхронизировано: ${pending.length}`, 'success');
-      } catch (e) {
-        console.error('Sync error', e);
-        await db.addLog({ level:'error', message:`syncPendingScans: ${e.message}` });
-      } finally {
-        updateSyncIndicator();
-      }
-    }
-
-    async function updateSyncIndicator() {
-      const indicator = document.getElementById('syncIndicator');
-      const scans = allScans;
-      const localCount = scans.length;
-      const pendingCount = scans.filter(s => s.sync_status === 'pending').length;
-      let text = `⇅ локально ${localCount}, в ожидании ${pendingCount}`;
-      if (pendingCount > 0) {
-        indicator.classList.add('pending');
-        indicator.classList.remove('ok');
-      } else {
-        indicator.classList.add('ok');
-        indicator.classList.remove('pending');
-      }
-      if (lastServerCount != null) text += ` / сервер ${lastServerCount}`;
-      indicator.textContent = text;
-    }
-
-    async function openDiagnostics() {
-      const logs = await db.getLogs();
-      const box = document.getElementById('diagnosticsLog');
-      if (!logs.length) box.textContent = 'Журнал пуст.';
-      else {
-        box.textContent = logs.map(l =>
-          `${new Date(l.ts).toLocaleString('ru-RU')} [${l.level}]: ${l.message}`
-        ).join('\n');
-      }
-      document.getElementById('diagnosticsModal').classList.add('active');
-    }
-    function closeDiagnostics() {
-      document.getElementById('diagnosticsModal').classList.remove('active');
-    }
-    async function clearDiagnosticsLog() {
-      await db.clearLogs();
-      document.getElementById('diagnosticsLog').textContent = 'Журнал пуст.';
-      showNotification('Журнал очищен', 'info');
-    }
-
-    document.addEventListener('DOMContentLoaded', async () => {
-      try {
-        await db.init();
-        await initBarcodeScanner();
-
-        const userInput = document.getElementById('userNameInput');
-        userInput.value = currentUser;
-        userInput.addEventListener('change', () => {
-          currentUser = userInput.value || 'Оператор';
-          localStorage.setItem('scan_user', currentUser);
-        });
-
-        const typeSelect = document.getElementById('typeSelect');
-        const savedType = localStorage.getItem('scan_type');
-        if (savedType) typeSelect.value = savedType;
-        typeSelect.addEventListener('change', () => {
-          localStorage.setItem('scan_type', typeSelect.value);
-        });
-
-        const blockInput = document.getElementById('blockInput');
-        const savedBlock = localStorage.getItem('scan_block');
-        if (savedBlock) blockInput.value = savedBlock;
-        blockInput.addEventListener('change', () => {
-          localStorage.setItem('scan_block', blockInput.value);
-        });
-
-        const updateConn = () => {
-          const el = document.getElementById('connectionStatus');
-          if (navigator.onLine) {
-            el.textContent = '✅ Онлайн (данные синхронизируются)';
-            syncPendingScans();
-          } else {
-            el.textContent = '🔴 Офлайн (записи сохраняются в телефоне)';
-          }
-        };
-        window.addEventListener('online', updateConn);
-        window.addEventListener('offline', updateConn);
-        updateConn();
-
-        document.getElementById('sampleInput').addEventListener('keypress', e => {
-          if (e.key === 'Enter') processScan();
-        });
-
-        await refreshScans();
-        document.getElementById('sampleInput').focus();
-      } catch (e) {
-        console.error(e);
-        await db.addLog({ level:'error', message:`init: ${e.message}` });
-        showNotification('❌ Ошибка инициализации', 'error');
-      }
-    });
-
-    setInterval(refreshScans, 30000);
-  </script>
 </body>
 </html>
+
