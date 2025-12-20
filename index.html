@@ -246,7 +246,6 @@
       cursor:pointer;
     }
     .btn-primary { background:var(--primary); color:#fff; }
-    .btn-primary:active { background:#5a67d8; }
 
     .search-box {
       padding:8px 10px;
@@ -263,11 +262,6 @@
       align-items:center;
       font-size:11px;
       margin-bottom:4px;
-    }
-    .filter-row label {
-      display:flex;
-      align-items:center;
-      gap:4px;
     }
 
     .wells-table {
@@ -287,12 +281,6 @@
       position:sticky;
       top:0;
       z-index:1;
-    }
-    .wells-table th,
-    .wells-table td {
-      padding:6px;
-      border-bottom:1px solid #eee;
-      text-align:left;
     }
 
     .footer-stats {
@@ -346,7 +334,6 @@
       gap:6px;
       cursor:pointer;
     }
-    .toolbar-btn:active { background:#5a67d8; transform:scale(0.97); }
 
     .loading {
       display:none;
@@ -483,7 +470,7 @@
           <input
             id="blockInput"
             type="text"
-            placeholder="Блок (сохраняется пока не измените)"
+            placeholder="Блок (вводите один раз)"
             autocomplete="off"
           >
         </div>
@@ -677,10 +664,9 @@
 
     function handleBarcodeDetected(code) {
       const input = document.getElementById('sampleInput');
-      if (input.value) return;
       input.value = code;
       input.classList.add('filled');
-      stopCamera();
+      stopCamera(); // просто подставляем код, НЕ пишем в БД
       updateScanResult('info', `Отсканировано: ${code}`);
       showNotification(`📷 Обнаружен: ${code}`, 'info');
     }
@@ -866,16 +852,17 @@
 
       if (!sample) {
         showNotification('⚠️ Введите Sample или отсканируйте', 'info');
-        return;
-      }
-      if (!wellName) {
-        showNotification('⚠️ Заполните поле "Скважина"', 'info');
-        document.getElementById('wellNameInput').focus();
+        document.getElementById('sampleInput').focus();
         return;
       }
       if (!block) {
         showNotification('⚠️ Заполните поле "Блок"', 'info');
         document.getElementById('blockInput').focus();
+        return;
+      }
+      if (!wellName) {
+        showNotification('⚠️ Заполните поле "Скважина"', 'info');
+        document.getElementById('wellNameInput').focus();
         return;
       }
 
