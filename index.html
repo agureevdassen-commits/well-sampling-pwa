@@ -402,7 +402,6 @@
 
     .hidden { display:none !important; }
 
-    /* Диагностика / модал */
     .modal {
       display:none;
       position:fixed;
@@ -422,6 +421,7 @@
       padding:12px;
       display:flex;
       flex-direction:column;
+      position:relative;
     }
     .modal-content h3 {
       font-size:14px;
@@ -482,7 +482,6 @@
     </div>
 
     <div class="main">
-      <!-- ЛЕВО: сканирование -->
       <div class="card scanner-panel">
         <h2>Сканирование</h2>
 
@@ -545,7 +544,6 @@
         </div>
       </div>
 
-      <!-- ПРАВО: список проб -->
       <div id="samplesPanel" class="card">
         <h3>Записанные пробы</h3>
 
@@ -602,7 +600,6 @@
       </div>
     </div>
 
-    <!-- Футер-статистика по кнопке -->
     <div id="footerStatsWrapper" class="footer-stats hidden">
       <div class="footer-grid">
         <div class="footer-item">
@@ -628,7 +625,6 @@
     <div class="spinner"></div>
   </div>
 
-  <!-- Модал диагностики -->
   <div id="diagnosticsModal" class="modal">
     <div class="modal-content">
       <button class="modal-close" onclick="closeDiagnostics()">✕</button>
@@ -647,7 +643,6 @@
       navigator.serviceWorker.register('/service-worker.js').catch(console.error);
     }
 
-    // CAMERA & BARCODE
     let codeReader = null;
     let cameraActive = false;
     let lastScannedBarcode = null;
@@ -664,38 +659,23 @@
     }
 
     async function startCamera() {
-  try {
-    if (!codeReader) await initBarcodeScanner();
+      try {
+        if (!codeReader) await initBarcodeScanner();
 
-    cameraActive = true;
-    updateCameraStatus('scanning');
-
-    const constraints = {
-      video: {
-        facingMode: { ideal: 'environment' }, // просим заднюю камеру
-        width:  { ideal: 640 },
-        height: { ideal: 480 },
-        frameRate: { ideal: 10, max: 12 }    // сниженный FPS
-      }
-    };
-
-    await codeReader.decodeFromConstraints(constraints, 'video', (result, err) => {
-      if (result && cameraActive) {
-        const code = result.getText();
-        if (lastScannedBarcode !== code) {
-          lastScannedBarcode = code;
-          handleBarcodeDetected(code);
+        const devices = await codeReader.listVideoInputDevices();
+        if (!devices.length) {
+          showNotification('❌ Камера не найдена', 'error');
+          updateCameraStatus('error');
+          return;
         }
-      }
-    });
-  } catch (e) {
-    console.error(e);
-    cameraActive = false;
-    updateCameraStatus('error');
-  }
-}
 
-        await codeReader.decodeFromConstraints(constraints, 'video', (result, err) => {
+        // чаще всего последняя камера — задняя
+        const deviceId = devices[devices.length - 1].deviceId;
+
+        cameraActive = true;
+        updateCameraStatus('scanning');
+
+        await codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
           if (result && cameraActive) {
             const code = result.getText();
             if (lastScannedBarcode !== code) {
@@ -744,7 +724,6 @@
       showNotification(`📷 Обнаружен: ${code}`, 'info');
     }
 
-    // IndexedDB
     const db = {
       name: 'sampling_scans_db_v2',
       instance: null,
@@ -848,7 +827,6 @@
       }
     };
 
-    // UI & логика
     let currentUser = localStorage.getItem('scan_user') || 'Оператор';
     let allScans = [];
     let lastServerCount = null;
@@ -974,7 +952,6 @@
         await refreshScans();
         await syncPendingScans();
 
-        // автофокус обратно на Sample
         document.getElementById('sampleInput').focus();
         await startCamera();
       } catch (e) {
@@ -1081,8 +1058,11 @@
           serverResponse = await res.json();
         } catch (_) {}
 
-        // предполагаем, что сервер может вернуть массив server_ids по порядку
         const serverIds = serverResponse.server_ids || [];
+        if (typeof serverResponse.total_on_server === 'number') {
+          lastServerCount = serverResponse.total_on_server;
+        }
+
         await db.markSynced(pending.map(p => p.id), serverIds);
         await refreshScans();
         await db.addLog({ level:'info', message:`sync ok: ${pending.length}` });
@@ -1116,7 +1096,6 @@
       indicator.textContent = text;
     }
 
-    // Диагностика
     async function openDiagnostics() {
       const logs = await db.getLogs();
       const box = document.getElementById('diagnosticsLog');
@@ -1196,4 +1175,3 @@
   </script>
 </body>
 </html>
-
